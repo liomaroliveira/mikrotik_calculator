@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerador MikroTik v3.1 - Full Config + NTP</title>
+    <style>
+        :root {
+            --bg: #1e1e2e;
+            --card-bg: #2b2b3b;
+            --input-bg: #181825;
+            --text: #cdd6f4;
+            --accent: #89b4fa;
+            --danger: #f38ba8;
+            --warning: #fab387;
+            --success: #a6e3a1;
+            --border: #45475a;
+        }
+        body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        .main-layout { display: flex; gap: 20px; width: 100%; max-width: 1200px; flex-wrap: wrap; }
+        .card { background: var(--card-bg); padding: 20px; border-radius: 8px; border: 1px solid var(--border); flex: 1; min-width: 320px; display: flex; flex-direction: column; }
+        
+        h2, h3 { color: var(--accent); margin-top: 0; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+        
+        label { display: block; margin-top: 15px; font-weight: 600; font-size: 0.9em; color: #a6adc8; }
+        .sub-label { font-size: 0.8em; color: #7f849c; margin-top: 2px; }
+        
+        select, input { width: 100%; padding: 10px; background: var(--input-bg); border: 1px solid var(--border); color: white; border-radius: 4px; margin-top: 5px; box-sizing: border-box; }
+        
+        /* Checkbox Custom */
+        .checkbox-wrapper { display: flex; align-items: center; margin-top: 15px; background: var(--input-bg); padding: 10px; border-radius: 4px; border: 1px solid var(--border); }
+        .checkbox-wrapper input { width: auto; margin-right: 10px; margin-top: 0; }
+        .checkbox-wrapper label { margin-top: 0; cursor: pointer; }
+
+        /* Hidden Sections */
+        .hidden { display: none; }
+        
+        /* Réguas */
+        .meter-box { margin-top: 15px; background: var(--input-bg); padding: 10px; border-radius: 6px; }
+        .meter-label { display: flex; justify-content: space-between; font-size: 0.8em; margin-bottom: 5px; }
+        .track { background: #313244; height: 8px; border-radius: 4px; overflow: hidden; }
+        .fill { height: 100%; width: 0%; transition: width 0.5s ease, background 0.5s; }
+        .low { background: var(--success); } .med { background: var(--warning); } .high { background: var(--danger); }
+
+        .specs-display { font-size: 0.85em; color: #9399b2; margin-top: 5px; background: #11111b; padding: 10px; border-radius: 4px; border-left: 3px solid var(--accent); }
+        
+        /* Botões */
+        .btn-group { display: flex; gap: 10px; margin-top: 20px; }
+        button { border: none; padding: 12px; border-radius: 4px; font-weight: bold; cursor: pointer; flex: 1; transition: 0.2s; }
+        .btn-primary { background: var(--accent); color: #1e1e2e; }
+        .btn-secondary { background: #45475a; color: white; }
+        .btn-success { background: var(--success); color: #1e1e2e; }
+        button:hover { opacity: 0.9; transform: translateY(-1px); }
+        
+        textarea { width: 100%; height: 400px; background: #11111b; color: #a6e3a1; border: 1px solid var(--border); font-family: 'Courier New', monospace; font-size: 13px; padding: 15px; resize: vertical; box-sizing: border-box; margin-top: 10px; border-radius: 6px; }
+
+        #verdict { margin-top: 20px; padding: 10px; border-radius: 4px; text-align: center; font-weight: bold; font-size: 0.9em; }
+    </style>
+</head>
+<body>
+
+<div class="main-layout">
+    <div class="card">
+        <h2>1. Hardware e Cenário</h2>
+        
+        <label>Modelo MikroTik:</label>
+        <select id="model" onchange="calculate()">
+            <option value="rb941">RB941-2nD (hAP lite)</option>
+            <option value="rb750r2">RB750r2 (hEX lite)</option>
+            <option value="rb750gr3" selected>RB750Gr3 (hEX)</option>
+            <option value="rb760igs">RB760iGS (hEX S)</option>
+            <option value="rb2011">RB2011UiAS</option>
+            <option value="rb3011">RB3011UiAS-RM</option>
+            <option value="rb4011">RB4011iGS+RM</option>
+            <option value="ccr1009">CCR1009-7G-1C-1S+</option>
+            <option value="ccr1036">CCR1036-8G-2S+</option>
+        </select>
+        <div id="specs-div" class="specs-display">...</div>
+
+        <label>Cenário de Uso:</label>
+        <select id="scenario" onchange="toggleFields(); calculate();">
+            <option value="hotspot">Hotspot (WiFeed / Captive Portal)</option>
+            <option value="corporativo">Corporativo (DHCP + Firewall)</option>
+            <option value="pppoe_server">Concentrador PPPoE</option>
+        </select>
+
+        <label>Parâmetros de Carga:</label>
+        <div style="display:flex; gap:10px;">
+            <div style="flex:1">
+                <span class="sub-label">Usuários Simultâneos</span>
+                <input type="number" id="users" value="50" min="1" oninput="calculate()">
+            </div>
+            <div style="flex:1">
+                <span class="sub-label">Link Total (Mbps)</span>
+                <input type="number" id="bandwidth" value="100" min="1" oninput="calculate()">
+            </div>
+        </div>
+
+        <h3 style="margin-top:20px;">2. Configurações do Script</h3>
+        
+        <div class="checkbox-wrapper">
+            <input type="checkbox" id="fullConfig" checked onchange="toggleFields()">
+            <label for="fullConfig">Gerar Script Completo (WAN, LAN, Bridge, Users, NTP)</label>
+        </div>
+
+        <div id="wanSettings">
+            <label>Tipo de Conexão WAN (Ether1):</label>
+            <select id="wanType" onchange="toggleFields()">
+                <option value="dhcp">Cliente DHCP (IP Dinâmico)</option>
+                <option value="pppoe">Cliente PPPoE (Discador)</option>
+                <option value="static">IP Estático</option>
+            </select>
+
+            <div id="pppoeFields" class="hidden">
+                <label>Usuário PPPoE:</label>
+                <input type="text" id="pppoeUser" placeholder="usuario@provedor">
+                <label>Senha PPPoE:</label>
+                <input type="text" id="pppoePass" placeholder="senha123">
+            </div>
+        </div>
+
+        <div class="checkbox-wrapper">
+            <input type="checkbox" id="createAdmin" checked>
+            <label for="createAdmin">Criar Admin "liomar" e remover default</label>
+        </div>
+
+        <button onclick="generateScript()" class="btn-primary" style="margin-top:20px;">Atualizar Script</button>
+    </div>
+
+    <div class="card">
+        <h2>3. Capacidade e Saída</h2>
+        
+        <div class="meter-box">
+            <div class="meter-label"><span>CPU Estimada</span> <span id="cpu-text">0%</span></div>
+            <div class="track"><div id="cpu-bar" class="fill low"></div></div>
+        </div>
+        <div class="meter-box">
+            <div class="meter-label"><span>RAM Estimada</span> <span id="ram-text">0/0 MB</span></div>
+            <div class="track"><div id="ram-bar" class="fill low"></div></div>
+        </div>
+        
+        <div id="verdict">Aguardando cálculo...</div>
+
+        <textarea id="output" readonly></textarea>
+        
+        <div class="btn-group">
+            <button onclick="copyToClipboard()" class="btn-secondary">📋 Copiar Texto</button>
+            <button onclick="downloadScript()" class="btn-success">💾 Baixar .rsc</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- BANCO DE DADOS DE HARDWARE ---
+    const hardwareDB = {
+        'rb941': { name: 'RB941-2nD (hAP lite)', cpu_score: 100, ram: 32, arch: 'SMIPS', ports_desc: '4x 10/100', lan_ports: ['ether2', 'ether3', 'ether4'] },
+        'rb750r2': { name: 'RB750r2 (hEX lite)', cpu_score: 130, ram: 64, arch: 'MIPSBE', ports_desc: '5x 10/100', lan_ports: ['ether2', 'ether3', 'ether4', 'ether5'] },
+        'rb750gr3': { name: 'RB750Gr3 (hEX)', cpu_score: 880, ram: 256, arch: 'MMIPS', ports_desc: '5x Gigabit', lan_ports: ['ether2', 'ether3', 'ether4', 'ether5'] },
+        'rb760igs': { name: 'RB760iGS (hEX S)', cpu_score: 890, ram: 256, arch: 'MMIPS', ports_desc: '5x Gigabit + 1x SFP', lan_ports: ['ether2', 'ether3', 'ether4', 'ether5', 'sfp1'] },
+        'rb2011': { name: 'RB2011UiAS', cpu_score: 150, ram: 128, arch: 'MIPSBE', ports_desc: '5x Giga + 5x 10/100 + 1x SFP', lan_ports: ['ether2', 'ether3', 'ether4', 'ether5', 'ether6', 'ether7', 'ether8', 'ether9', 'ether10', 'sfp1'] },
+        'rb3011': { name: 'RB3011UiAS', cpu_score: 2200, ram: 1024, arch: 'ARM', ports_desc: '10x Gigabit + 1x SFP', lan_ports: ['ether2', 'ether3', 'ether4', 'ether5', 'ether6', 'ether7', 'ether8', 'ether9', 'ether10', 'sfp1'] },
+        'rb4011': { name: 'RB4011iGS+', cpu_score: 5500, ram: 1024, arch: 'ARM', ports_desc: '10x Gigabit + 1x SFP+', lan_ports: ['ether2', 'ether3', 'ether4', 'ether5', 'ether6', 'ether7', 'ether8', 'ether9', 'ether10', 'sfp-sfpplus1'] },
+        'ccr1009': { name: 'CCR1009-7G-1C-1S+', cpu_score: 7500, ram: 2048, arch: 'TILE', ports_desc: '7x Giga + 1x Combo + 1x SFP+', lan_ports: ['ether2', 'ether3', 'ether4', 'ether5', 'ether6', 'ether7', 'combo1', 'sfp-sfpplus1'] },
+        'ccr1036': { name: 'CCR1036-8G-2S+', cpu_score: 28000, ram: 4096, arch: 'TILE', ports_desc: '8x Gigabit + 2x SFP+', lan_ports: ['ether2', 'ether3', 'ether4', 'ether5', 'ether6', 'ether7', 'ether8', 'sfp-sfpplus1', 'sfp-sfpplus2'] }
+    };
+
+    // --- CONTROLE DE UI ---
+    function toggleFields() {
+        const fullConfig = document.getElementById('fullConfig').checked;
+        const wanType = document.getElementById('wanType').value;
+        const scenario = document.getElementById('scenario').value;
+
+        // Exibir/Ocultar Container WAN
+        document.getElementById('wanSettings').style.display = fullConfig ? 'block' : 'none';
+        
+        // Exibir/Ocultar Campos PPPoE
+        const pppoeFields = document.getElementById('pppoeFields');
+        if (fullConfig && wanType === 'pppoe') {
+            pppoeFields.style.display = 'block';
+        } else {
+            pppoeFields.style.display = 'none';
+        }
+    }
+
+    // --- CÁLCULO DE CARGA ---
+    function calculate() {
+        const modelKey = document.getElementById('model').value;
+        const hw = hardwareDB[modelKey];
+        const scenario = document.getElementById('scenario').value;
+        const users = parseInt(document.getElementById('users').value) || 0;
+        const bandwidth = parseInt(document.getElementById('bandwidth').value) || 0;
+
+        // 1. Display Specs
+        document.getElementById('specs-div').innerHTML = 
+            `<strong>CPU:</strong> ${hw.arch} (Score: ${hw.cpu_score})<br>
+             <strong>RAM:</strong> ${hw.ram} MB<br>
+             <strong>Portas:</strong> ${hw.ports_desc}`;
+
+        // 2. Cálculo RAM
+        let baseRam = (hw.arch === 'TILE' || hw.arch === 'ARM') ? 45 : 15;
+        let ramPerUser = (scenario === 'hotspot') ? 0.45 : 0.05;
+        let totalRam = baseRam + (users * ramPerUser);
+        let ramPercent = (totalRam / hw.ram) * 100;
+
+        // 3. Cálculo CPU
+        let complexity = (scenario === 'hotspot') ? 1.5 : 2.5;
+        let totalCpuPoints = (bandwidth * 0.8) + (users * complexity);
+        if (hw.ports_desc.includes('10/100') && bandwidth > 95) totalCpuPoints += 500;
+        let cpuPercent = (totalCpuPoints / hw.cpu_score) * 100;
+
+        // 4. Update Barras
+        updateBar('cpu', cpuPercent, 100);
+        updateBar('ram', ramPercent, hw.ram, totalRam.toFixed(1));
+
+        // 5. Veredito
+        const verdict = document.getElementById('verdict');
+        if (ramPercent > 95 || cpuPercent > 95) {
+            verdict.innerHTML = "❌ INVIÁVEL: Hardware insuficiente.";
+            verdict.style.backgroundColor = "var(--danger)";
+            verdict.style.color = "#1e1e2e";
+        } else if (ramPercent > 80 || cpuPercent > 80) {
+            verdict.innerHTML = "⚠️ ALERTA: Hardware no limite.";
+            verdict.style.backgroundColor = "var(--warning)";
+            verdict.style.color = "#1e1e2e";
+        } else {
+            verdict.innerHTML = "✅ APROVADO: Hardware adequado.";
+            verdict.style.backgroundColor = "var(--success)";
+            verdict.style.color = "#1e1e2e";
+        }
+    }
+
+    function updateBar(type, percent, maxVal, currentValText = null) {
+        const bar = document.getElementById(`${type}-bar`);
+        const text = document.getElementById(`${type}-text`);
+        let visualPercent = Math.min(percent, 100);
+        bar.style.width = `${visualPercent}%`;
+        bar.className = 'fill ' + (percent < 60 ? 'low' : percent < 85 ? 'med' : 'high');
+        text.innerText = currentValText ? `${currentValText} / ${maxVal} MB (${Math.round(percent)}%)` : `${Math.round(percent)}%`;
+    }
+
+    // --- GERADOR DE SCRIPT ---
+    function generateScript() {
+        const modelKey = document.getElementById('model').value;
+        const hw = hardwareDB[modelKey];
+        const scenario = document.getElementById('scenario').value;
+        const fullConfig = document.getElementById('fullConfig').checked;
+        
+        let s = `# Script Gerado em ${new Date().toLocaleString()}\n`;
+        s += `# Hardware: ${hw.name} | Cenário: ${scenario.toUpperCase()}\n`;
+        s += `# ---------------------------------------------------\n\n`;
+
+        if (fullConfig) {
+            // 1. Identidade e Usuários
+            s += `/system identity set name="MikroTik-${scenario}"\n`;
+            
+            if (document.getElementById('createAdmin').checked) {
+                s += `# --- USUARIOS ---\n`;
+                s += `/user add name="liomar" password="Mudar@123" group=full comment="Admin"\n`;
+                s += `/user remove [find name="admin"]\n\n`;
+            }
+
+            // 2. Interfaces e Bridge
+            s += `# --- INTERFACES & BRIDGE ---\n`;
+            s += `/interface ethernet set [find default-name=ether1] name="ether1-WAN" comment="Link Internet"\n`;
+            s += `/interface bridge add name="bridge-LAN" comment="Bridge Local"\n`;
+            
+            // Adicionar portas LAN na Bridge
+            hw.lan_ports.forEach(port => {
+                s += `/interface bridge port add bridge=bridge-LAN interface=${port}\n`;
+            });
+            s += `\n`;
+
+            // 3. VLAN Hotspot (Se aplicável)
+            if (scenario === 'hotspot') {
+                s += `# --- VLAN HOTSPOT WIFEED ---\n`;
+                s += `# VLAN criada na Bridge para tagear o tráfego dos APs\n`;
+                s += `/interface vlan add interface=bridge-LAN name="VLAN_100_WIFEED" vlan-id=100\n`;
+                s += `\n`;
+            }
+
+            // 4. Configuração WAN
+            s += `# --- CONEXAO WAN ---\n`;
+            const wanType = document.getElementById('wanType').value;
+            
+            if (wanType === 'dhcp') {
+                s += `/ip dhcp-client add interface=ether1-WAN disabled=no\n`;
+            } else if (wanType === 'pppoe') {
+                const pUser = document.getElementById('pppoeUser').value || 'usuario';
+                const pPass = document.getElementById('pppoePass').value || 'senha';
+                s += `/interface pppoe-client add name="pppoe-out1" interface=ether1-WAN user="${pUser}" password="${pPass}" disabled=no add-default-route=yes use-peer-dns=yes\n`;
+            } else {
+                s += `# Configure o IP Estatico manualmente em /ip address\n`;
+            }
+            s += `\n`;
+
+            // 5. DNS (Essencial para o NTP funcionar)
+            s += `# --- DNS (Google + Cloudflare) ---\n`;
+            s += `/ip dns set allow-remote-requests=yes servers=8.8.8.8,1.1.1.1\n`;
+            s += `\n`;
+
+            // 6. Relógio e NTP (NOVO!)
+            s += `# --- CLOCK & NTP (AUTO TIME) ---\n`;
+            s += `# Fuso Horário definido para Bahia (Capim Grosso)\n`;
+            s += `/system clock set time-zone-name=America/Bahia\n`;
+            s += `# Cliente NTP usando servidores do ntp.br\n`;
+            s += `# Nota: Requer pacote 'ntp' instalado ou usa SNTP nativo\n`;
+            s += `/system ntp client set enabled=yes primary-ntp=200.160.7.186 secondary-ntp=200.189.40.8\n`;
+            s += `/system sntp client set enabled=yes primary-ntp=200.160.7.186 secondary-ntp=200.189.40.8\n`;
+            s += `\n`;
+
+            // 7. Endereçamento LAN
+            s += `# --- ENDERECOS LAN ---\n`;
+            if (scenario === 'hotspot') {
+                // IP de Gerência na Bridge
+                s += `/ip address add address=192.168.88.1/24 interface=bridge-LAN comment="Gerencia"\n`;
+                // IP do Hotspot na VLAN
+                s += `/ip address add address=10.10.0.1/22 interface=VLAN_100_WIFEED comment="Rede Hotspot"\n`;
+            } else {
+                s += `/ip address add address=192.168.88.1/24 interface=bridge-LAN comment="LAN"\n`;
+            }
+            s += `\n`;
+
+            // 8. Servidor DHCP LAN (Gerência)
+            s += `# --- DHCP SERVER (GERENCIA) ---\n`;
+            s += `/ip pool add name=pool-mgmt ranges=192.168.88.10-192.168.88.254\n`;
+            s += `/ip dhcp-server add name=dhcp-mgmt interface=bridge-LAN address-pool=pool-mgmt disabled=no\n`;
+            s += `/ip dhcp-server network add address=192.168.88.0/24 gateway=192.168.88.1 dns-server=192.168.88.1\n`;
+            s += `\n`;
+
+            // 9. Firewall Básico
+            s += `# --- FIREWALL NAT & FILTER ---\n`;
+            s += `/ip firewall nat add action=masquerade chain=srcnat out-interface-list=WAN comment="Masquerade"\n`;
+            s += `/interface list add name=WAN\n`;
+            s += `/interface list add name=LAN\n`;
+            
+            let wanIf = (wanType === 'pppoe') ? 'pppoe-out1' : 'ether1-WAN';
+            s += `/interface list member add interface=${wanIf} list=WAN\n`;
+            s += `/interface list member add interface=bridge-LAN list=LAN\n`;
+            
+            s += `\n`;
+        }
+
+        // --- OTIMIZAÇÕES DE PERFORMANCE (Sempre incluídas) ---
+        s += `# --- OTIMIZACAO DE PERFORMANCE ---\n`;
+        
+        // FastTrack
+        s += `/ip firewall filter add chain=forward action=fasttrack-connection connection-state=established,related comment="FastTrack"\n`;
+        s += `/ip firewall filter add chain=forward action=accept connection-state=established,related comment="Accept Est"\n`;
+
+        // Ajustes finos baseados no cenário
+        if (scenario === 'hotspot') {
+            s += `# Tunning para Hotspot (Economia de RAM)\n`;
+            s += `/ip firewall connection tracking set tcp-established-timeout=30m udp-timeout=10s\n`;
+            s += `/ip neighbor discovery-settings set discover-interface-list=none\n`;
+            if (fullConfig) {
+                 s += `# Nota: O DHCP do Hotspot (VLAN_100) deve ser configurado pelo script do WiFeed.\n`;
+            }
+        }
+
+        // Watchdog
+        s += `/system watchdog set watchdog-timer=yes\n`;
+
+        // Desativar pacotes inúteis se tiver pouca RAM
+        if (hw.ram < 64) {
+            s += `# Hardware Limitado detectado: Desativando IPv6 e MPLS\n`;
+            s += `/system package disable ipv6,mpls\n`;
+        }
+
+        document.getElementById('output').value = s;
+    }
+
+    // --- FUNÇÕES DE EXPORTAÇÃO ---
+    function copyToClipboard() {
+        const copyText = document.getElementById("output");
+        copyText.select();
+        document.execCommand("copy");
+        // Feedback visual
+        const btn = document.querySelector('.btn-secondary');
+        const original = btn.innerHTML;
+        btn.innerHTML = "Copiado! ✅";
+        setTimeout(() => btn.innerHTML = original, 2000);
+    }
+
+    function downloadScript() {
+        const text = document.getElementById("output").value;
+        const blob = new Blob([text], { type: "text/plain" });
+        const anchor = document.createElement("a");
+        const model = document.getElementById('model').value;
+        
+        anchor.download = `config_mikrotik_${model}.rsc`;
+        anchor.href = window.URL.createObjectURL(blob);
+        anchor.target = "_blank";
+        anchor.style.display = "none";
+        document.body.appendChild(anchor);
+        anchor.click();
+        document.body.removeChild(anchor);
+    }
+
+    // Init
+    calculate();
+    toggleFields();
+</script>
+
+</body>
+</html>
