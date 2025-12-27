@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gerador MikroTik v3.2 - Calibrado</title>
+    <title>Gerador MikroTik v3.3 - Queues & FastTrack Fix</title>
     <style>
         :root {
             --bg: #1e1e2e;
@@ -27,15 +27,12 @@
         
         select, input { width: 100%; padding: 10px; background: var(--input-bg); border: 1px solid var(--border); color: white; border-radius: 4px; margin-top: 5px; box-sizing: border-box; }
         
-        /* Checkbox Custom */
         .checkbox-wrapper { display: flex; align-items: center; margin-top: 15px; background: var(--input-bg); padding: 10px; border-radius: 4px; border: 1px solid var(--border); }
         .checkbox-wrapper input { width: auto; margin-right: 10px; margin-top: 0; }
         .checkbox-wrapper label { margin-top: 0; cursor: pointer; }
 
-        /* Hidden Sections */
         .hidden { display: none; }
         
-        /* Réguas */
         .meter-box { margin-top: 15px; background: var(--input-bg); padding: 10px; border-radius: 6px; }
         .meter-label { display: flex; justify-content: space-between; font-size: 0.8em; margin-bottom: 5px; }
         .track { background: #313244; height: 8px; border-radius: 4px; overflow: hidden; }
@@ -44,7 +41,6 @@
 
         .specs-display { font-size: 0.85em; color: #9399b2; margin-top: 5px; background: #11111b; padding: 10px; border-radius: 4px; border-left: 3px solid var(--accent); }
         
-        /* Botões */
         .btn-group { display: flex; gap: 10px; margin-top: 20px; }
         button { border: none; padding: 12px; border-radius: 4px; font-weight: bold; cursor: pointer; flex: 1; transition: 0.2s; }
         .btn-primary { background: var(--accent); color: #1e1e2e; }
@@ -53,7 +49,8 @@
         button:hover { opacity: 0.9; transform: translateY(-1px); }
         
         textarea { width: 100%; height: 400px; background: #11111b; color: #a6e3a1; border: 1px solid var(--border); font-family: 'Courier New', monospace; font-size: 13px; padding: 15px; resize: vertical; box-sizing: border-box; margin-top: 10px; border-radius: 6px; }
-
+        
+        #realTrafficDisplay { font-size: 0.8em; color: var(--warning); margin-top: 5px; text-align: right; }
         #verdict { margin-top: 20px; padding: 10px; border-radius: 4px; text-align: center; font-weight: bold; font-size: 0.9em; }
     </style>
 </head>
@@ -87,7 +84,7 @@
         <label>Parâmetros de Carga:</label>
         <div style="display:flex; gap:10px;">
             <div style="flex:1">
-                <span class="sub-label">Usuários Simultâneos</span>
+                <span class="sub-label">Usuários Ativos</span>
                 <input type="number" id="users" value="25" min="1" oninput="calculate()">
             </div>
             <div style="flex:1">
@@ -95,12 +92,27 @@
                 <input type="number" id="bandwidth" value="1000" min="1" oninput="calculate()">
             </div>
         </div>
+        
+        <div id="userSpeedContainer">
+            <label>Plano por Usuário (Controle de Banda):</label>
+            <div style="display:flex; gap:10px;">
+                <div style="flex:1">
+                    <span class="sub-label">Download (Mbps)</span>
+                    <input type="number" id="userDl" value="10" min="1" oninput="calculate()">
+                </div>
+                <div style="flex:1">
+                    <span class="sub-label">Upload (Mbps)</span>
+                    <input type="number" id="userUl" value="5" min="1" oninput="calculate()">
+                </div>
+            </div>
+            <div id="realTrafficDisplay">Tráfego Real Estimado: 0 Mbps</div>
+        </div>
 
         <h3 style="margin-top:20px;">2. Configurações do Script</h3>
         
         <div class="checkbox-wrapper">
             <input type="checkbox" id="fullConfig" checked onchange="toggleFields()">
-            <label for="fullConfig">Gerar Script Completo (WAN, LAN, Bridge, Users, NTP)</label>
+            <label for="fullConfig">Gerar Script Completo</label>
         </div>
 
         <div id="wanSettings">
@@ -121,7 +133,7 @@
 
         <div class="checkbox-wrapper">
             <input type="checkbox" id="createAdmin" checked>
-            <label for="createAdmin">Criar Admin "liomar" e remover default</label>
+            <label for="createAdmin">Criar Admin "liomar" (Senha Segura)</label>
         </div>
 
         <button onclick="generateScript()" class="btn-primary" style="margin-top:20px;">Atualizar Script</button>
@@ -151,7 +163,6 @@
 </div>
 
 <script>
-    // --- BANCO DE DADOS DE HARDWARE ---
     const hardwareDB = {
         'rb941': { name: 'RB941-2nD (hAP lite)', cpu_score: 100, ram: 32, arch: 'SMIPS', ports_desc: '4x 10/100', lan_ports: ['ether2', 'ether3', 'ether4'] },
         'rb750r2': { name: 'RB750r2 (hEX lite)', cpu_score: 130, ram: 64, arch: 'MIPSBE', ports_desc: '5x 10/100', lan_ports: ['ether2', 'ether3', 'ether4', 'ether5'] },
@@ -164,57 +175,71 @@
         'ccr1036': { name: 'CCR1036-8G-2S+', cpu_score: 28000, ram: 4096, arch: 'TILE', ports_desc: '8x Gigabit + 2x SFP+', lan_ports: ['ether2', 'ether3', 'ether4', 'ether5', 'ether6', 'ether7', 'ether8', 'sfp-sfpplus1', 'sfp-sfpplus2'] }
     };
 
-    // --- CONTROLE DE UI ---
     function toggleFields() {
         const fullConfig = document.getElementById('fullConfig').checked;
         const wanType = document.getElementById('wanType').value;
         const pppoeFields = document.getElementById('pppoeFields');
         
         document.getElementById('wanSettings').style.display = fullConfig ? 'block' : 'none';
-        
-        if (fullConfig && wanType === 'pppoe') {
-            pppoeFields.style.display = 'block';
-        } else {
-            pppoeFields.style.display = 'none';
-        }
+        pppoeFields.style.display = (fullConfig && wanType === 'pppoe') ? 'block' : 'none';
     }
 
-    // --- CÁLCULO DE CARGA (ALGORITMO V3.2) ---
     function calculate() {
         const modelKey = document.getElementById('model').value;
         const hw = hardwareDB[modelKey];
         const scenario = document.getElementById('scenario').value;
         const users = parseInt(document.getElementById('users').value) || 0;
-        const bandwidth = parseInt(document.getElementById('bandwidth').value) || 0;
+        const linkTotal = parseInt(document.getElementById('bandwidth').value) || 0;
+        const userDl = parseInt(document.getElementById('userDl').value) || 0;
+        
+        // --- 1. CÁLCULO DE TRÁFEGO REAL ---
+        // O tráfego nunca será maior que o Link Total, nem maior que a soma dos planos dos usuários
+        // Consideramos um fator de simultaneidade (nem todo mundo baixa a 100% o tempo todo)
+        // Hotspot simultaneidade alta (0.8), Corporativo (0.4)
+        let simultaneity = (scenario === 'hotspot') ? 0.8 : 0.4;
+        let potentialTraffic = users * userDl * simultaneity;
+        let effectiveTraffic = Math.min(linkTotal, potentialTraffic);
+        
+        document.getElementById('realTrafficDisplay').innerText = 
+            `Tráfego Real Estimado: ~${Math.round(effectiveTraffic)} Mbps (Simultaneidade: ${simultaneity*100}%)`;
 
         document.getElementById('specs-div').innerHTML = 
             `<strong>CPU:</strong> ${hw.arch} (Score: ${hw.cpu_score})<br>
              <strong>RAM:</strong> ${hw.ram} MB<br>
              <strong>Portas:</strong> ${hw.ports_desc}`;
 
-        // 1. Cálculo RAM (Mantido)
+        // --- 2. CÁLCULO RAM ---
         let baseRam = (hw.arch === 'TILE' || hw.arch === 'ARM') ? 45 : 15;
-        let ramPerUser = (scenario === 'hotspot') ? 0.45 : 0.05;
+        let ramPerUser = (scenario === 'hotspot') ? 0.50 : 0.10; // Aumentei levemente pois queues consomem RAM
         let totalRam = baseRam + (users * ramPerUser);
         let ramPercent = (totalRam / hw.ram) * 100;
 
-        // 2. Cálculo CPU (RECALIBRADO v3.2)
-        // Antes: Bandwidth * 0.8 (Muito agressivo)
-        // Agora: Bandwidth * 0.3 (Considerando FastTrack/Hardware Offload parcial)
-        let bwWeight = 0.3; 
+        // --- 3. CÁLCULO CPU (QUEUES VS FASTTRACK) ---
+        // Se for Hotspot, FastTrack é DESLIGADO para clientes -> Processamento via CPU
+        // Se for Corporativo, FastTrack LIGADO -> Processamento via Switch Chip/Offload
         
-        // Se for 10/100, a CPU sofre mais com interrupções se saturar a porta
-        if (hw.ports_desc.includes('10/100') && bandwidth > 90) bwWeight = 0.6;
+        let cpuFactorPerMbps = 0;
+        
+        if (scenario === 'hotspot') {
+            // Sem FastTrack + Overhead de Queues
+            // RB750Gr3 (880 score) aguenta ~350Mbps de Queues Simples
+            cpuFactorPerMbps = 1.2; 
+        } else if (scenario === 'pppoe_server') {
+            // Encapsulamento pesa
+            cpuFactorPerMbps = 1.0;
+        } else {
+            // Corporativo com FastTrack (Muito leve)
+            cpuFactorPerMbps = 0.2;
+        }
 
-        let complexity = (scenario === 'hotspot') ? 1.5 : 2.0; 
-        
-        // Custo Base de Banda
-        let bwCost = bandwidth * bwWeight;
-        
-        // Custo Base de Usuários
-        let userCost = users * complexity;
+        // Penalidade por quantidade de Queues (Scan linear consome CPU)
+        let queueOverhead = users * 0.5; 
 
-        let totalCpuPoints = bwCost + userCost;
+        // Penalidade por Gargalo Físico (Porta 100M saturada gera muita interrupção)
+        let portBottleneck = 0;
+        if (hw.ports_desc.includes('10/100') && effectiveTraffic > 90) portBottleneck = 500;
+
+        let totalCpuPoints = (effectiveTraffic * cpuFactorPerMbps) + queueOverhead + portBottleneck;
         let cpuPercent = (totalCpuPoints / hw.cpu_score) * 100;
 
         updateBar('cpu', cpuPercent, 100);
@@ -222,15 +247,15 @@
 
         const verdict = document.getElementById('verdict');
         if (ramPercent > 95 || cpuPercent > 95) {
-            verdict.innerHTML = "❌ INVIÁVEL: Hardware insuficiente.";
+            verdict.innerHTML = "❌ INVIÁVEL: Hardware insuficiente para Queues/Tráfego.";
             verdict.style.backgroundColor = "var(--danger)";
             verdict.style.color = "#1e1e2e";
         } else if (ramPercent > 80 || cpuPercent > 80) {
-            verdict.innerHTML = "⚠️ ALERTA: Hardware no limite.";
+            verdict.innerHTML = "⚠️ ALERTA: Hardware operando no limite.";
             verdict.style.backgroundColor = "var(--warning)";
             verdict.style.color = "#1e1e2e";
         } else {
-            verdict.innerHTML = "✅ APROVADO: Hardware adequado.";
+            verdict.innerHTML = "✅ APROVADO: Hardware suporta a carga.";
             verdict.style.backgroundColor = "var(--success)";
             verdict.style.color = "#1e1e2e";
         }
@@ -245,19 +270,20 @@
         text.innerText = currentValText ? `${currentValText} / ${maxVal} MB (${Math.round(percent)}%)` : `${Math.round(percent)}%`;
     }
 
-    // --- GERADOR DE SCRIPT ---
     function generateScript() {
         const modelKey = document.getElementById('model').value;
         const hw = hardwareDB[modelKey];
         const scenario = document.getElementById('scenario').value;
         const fullConfig = document.getElementById('fullConfig').checked;
+        const userDl = document.getElementById('userDl').value;
+        const userUl = document.getElementById('userUl').value;
         
         let s = `# Script Gerado em ${new Date().toLocaleString()}\n`;
-        s += `# Hardware: ${hw.name} | Cenário: ${scenario.toUpperCase()}\n\n`;
+        s += `# Hardware: ${hw.name} | Cenário: ${scenario.toUpperCase()}\n`;
+        s += `# Plano Usuário: ${userDl}M Down / ${userUl}M Up\n\n`;
 
         if (fullConfig) {
             s += `/system identity set name="MikroTik-${scenario}"\n`;
-            
             if (document.getElementById('createAdmin').checked) {
                 s += `# --- USUARIOS ---\n`;
                 s += `/user add name="liomar" password="Mudar@123" group=full comment="Admin"\n`;
@@ -267,28 +293,24 @@
             s += `# --- INTERFACES & BRIDGE ---\n`;
             s += `/interface ethernet set [find default-name=ether1] name="ether1-WAN" comment="Link Internet"\n`;
             s += `/interface bridge add name="bridge-LAN" comment="Bridge Local"\n`;
-            
             hw.lan_ports.forEach(port => {
                 s += `/interface bridge port add bridge=bridge-LAN interface=${port}\n`;
             });
             s += `\n`;
 
             if (scenario === 'hotspot') {
-                s += `# --- VLAN HOTSPOT WIFEED ---\n`;
+                s += `# --- VLAN HOTSPOT ---\n`;
                 s += `/interface vlan add interface=bridge-LAN name="VLAN_100_WIFEED" vlan-id=100\n\n`;
             }
 
             s += `# --- CONEXAO WAN ---\n`;
             const wanType = document.getElementById('wanType').value;
-            
             if (wanType === 'dhcp') {
                 s += `/ip dhcp-client add interface=ether1-WAN disabled=no\n`;
             } else if (wanType === 'pppoe') {
                 const pUser = document.getElementById('pppoeUser').value || 'usuario';
                 const pPass = document.getElementById('pppoePass').value || 'senha';
                 s += `/interface pppoe-client add name="pppoe-out1" interface=ether1-WAN user="${pUser}" password="${pPass}" disabled=no add-default-route=yes use-peer-dns=yes\n`;
-            } else {
-                s += `# Configure o IP Estatico manualmente em /ip address\n`;
             }
             s += `\n`;
 
@@ -306,25 +328,27 @@
             }
             s += `\n`;
 
-            s += `# --- DHCP SERVER (GERENCIA) ---\n`;
+            s += `# --- DHCP & NAT ---\n`;
             s += `/ip pool add name=pool-mgmt ranges=192.168.88.10-192.168.88.254\n`;
             s += `/ip dhcp-server add name=dhcp-mgmt interface=bridge-LAN address-pool=pool-mgmt disabled=no\n`;
             s += `/ip dhcp-server network add address=192.168.88.0/24 gateway=192.168.88.1 dns-server=192.168.88.1\n`;
-            s += `\n`;
-
-            s += `# --- FIREWALL NAT & FILTER ---\n`;
-            s += `/ip firewall nat add action=masquerade chain=srcnat out-interface-list=WAN comment="Masquerade"\n`;
-            s += `/interface list add name=WAN\n`;
-            s += `/interface list add name=LAN\n`;
-            
+            s += `/ip firewall nat add action=masquerade chain=srcnat out-interface-list=WAN\n`;
+            s += `/interface list add name=WAN\n/interface list add name=LAN\n`;
             let wanIf = (wanType === 'pppoe') ? 'pppoe-out1' : 'ether1-WAN';
             s += `/interface list member add interface=${wanIf} list=WAN\n`;
-            s += `/interface list member add interface=bridge-LAN list=LAN\n`;
-            s += `\n`;
+            s += `/interface list member add interface=bridge-LAN list=LAN\n\n`;
         }
 
-        s += `# --- OTIMIZACAO DE PERFORMANCE ---\n`;
-        s += `/ip firewall filter add chain=forward action=fasttrack-connection connection-state=established,related comment="FastTrack"\n`;
+        s += `# --- OTIMIZACAO (QUEUES & FASTTRACK) ---\n`;
+        s += `# FastTrack configurado para permitir Queues no Hotspot\n`;
+        
+        if (scenario === 'hotspot') {
+            // A REGRA DE OURO: Excluir a interface do Hotspot do FastTrack
+            s += `/ip firewall filter add chain=forward action=fasttrack-connection connection-state=established,related out-interface=!VLAN_100_WIFEED src-address=!10.10.0.0/22 comment="FastTrack (Exceto Hotspot)"\n`;
+        } else {
+            s += `/ip firewall filter add chain=forward action=fasttrack-connection connection-state=established,related comment="FastTrack Global"\n`;
+        }
+        
         s += `/ip firewall filter add chain=forward action=accept connection-state=established,related comment="Accept Est"\n`;
 
         if (scenario === 'hotspot') {
@@ -333,10 +357,7 @@
         }
 
         s += `/system watchdog set watchdog-timer=yes\n`;
-
-        if (hw.ram < 64) {
-            s += `/system package disable ipv6,mpls\n`;
-        }
+        if (hw.ram < 64) s += `/system package disable ipv6,mpls\n`;
 
         document.getElementById('output').value = s;
     }
@@ -345,10 +366,6 @@
         const copyText = document.getElementById("output");
         copyText.select();
         document.execCommand("copy");
-        const btn = document.querySelector('.btn-secondary');
-        const original = btn.innerHTML;
-        btn.innerHTML = "Copiado! ✅";
-        setTimeout(() => btn.innerHTML = original, 2000);
     }
 
     function downloadScript() {
@@ -358,8 +375,6 @@
         const model = document.getElementById('model').value;
         anchor.download = `config_mikrotik_${model}.rsc`;
         anchor.href = window.URL.createObjectURL(blob);
-        anchor.target = "_blank";
-        anchor.style.display = "none";
         document.body.appendChild(anchor);
         anchor.click();
         document.body.removeChild(anchor);
