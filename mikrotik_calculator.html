@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MikroTik Architect v4.1 (Mobile Ready)</title>
+    <title>MikroTik Architect v4.2 (Management Edition)</title>
     <style>
         :root {
             --bg: #13131f; --card-bg: #1e1e2e; --input-bg: #181825;
@@ -28,7 +28,7 @@
             animation: fadeIn 0.5s ease-out; 
         }
         
-        @media (max-width: 900px) {
+        @media (max-width: 950px) {
             .layout-container { grid-template-columns: 1fr; }
             .sidebar { order: -1; position: static; margin-bottom: 20px; }
             h1 { font-size: 1.5rem; }
@@ -42,72 +42,69 @@
         /* Cards */
         .card { background: var(--card-bg); padding: 20px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
         
-        /* Sticky Sidebar */
-        .sidebar { position: sticky; top: 20px; height: fit-content; display: flex; flex-direction: column; gap: 15px; }
-        
         /* Inputs */
         select, input[type="number"], input[type="text"], input[type="password"] { 
-            width: 100%; padding: 12px; background: var(--input-bg); border: 1px solid var(--border); 
-            color: white; border-radius: 6px; margin-top: 6px; font-size: 16px; /* Evita zoom no iOS */
+            width: 100%; padding: 10px; background: var(--input-bg); border: 1px solid var(--border); 
+            color: white; border-radius: 6px; margin-top: 5px; font-size: 14px;
         }
         select:focus, input:focus { border-color: var(--accent); }
         
         /* Checkboxes */
-        .checkbox-wrapper { display: flex; align-items: center; margin-top: 10px; background: rgba(255,255,255,0.03); padding: 12px; border-radius: 6px; cursor: pointer; }
-        .checkbox-wrapper input { width: 20px; height: 20px; margin-right: 12px; cursor: pointer; }
-        .checkbox-wrapper label { margin: 0; cursor: pointer; flex: 1; }
+        .checkbox-wrapper { display: flex; align-items: center; margin-top: 8px; background: rgba(255,255,255,0.03); padding: 10px; border-radius: 6px; cursor: pointer; border: 1px solid transparent; }
+        .checkbox-wrapper:hover { border-color: var(--border); }
+        .checkbox-wrapper input { width: 18px; height: 18px; margin-right: 10px; cursor: pointer; }
+        .checkbox-wrapper label { margin: 0; cursor: pointer; flex: 1; font-size: 0.9em; }
 
         /* Botões */
-        .btn { border: none; padding: 14px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-size: 1rem; width: 100%; transition: 0.2s; }
+        .btn { border: none; padding: 12px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-size: 0.95rem; width: 100%; transition: 0.2s; }
         .btn:active { transform: scale(0.98); }
         .btn-primary { background: var(--accent); color: #1e1e2e; box-shadow: 0 4px 15px rgba(137, 180, 250, 0.3); }
         .btn-adv { background: #313244; color: white; border: 1px solid var(--border); }
-        .btn-ghost { background: transparent; color: var(--accent); border: 1px solid var(--accent); font-size: 0.85rem; padding: 8px; }
+        .btn-ghost { background: transparent; color: var(--accent); border: 1px solid var(--accent); font-size: 0.85rem; padding: 6px 12px; }
         
-        /* Status Bars */
+        /* Status Bars (Universal Style) */
         .meter-box { background: var(--input-bg); padding: 12px; border-radius: 8px; margin-top: 10px; border: 1px solid var(--border); }
         .meter-label { display: flex; justify-content: space-between; font-size: 0.85em; margin-bottom: 6px; font-weight: bold; }
         .track { background: #111; height: 10px; border-radius: 5px; overflow: hidden; }
         .fill { height: 100%; width: 0%; transition: width 0.5s ease; }
         .low { background: var(--success); } .med { background: var(--warning); } .high { background: var(--danger); }
+        .mini-detail { text-align:right; font-size:0.75em; color:#777; margin-top:4px; }
         
-        /* Tooltip Mobile Friendly */
+        /* Tooltip */
         .info-icon { 
-            display: inline-flex; justify-content: center; align-items: center; width: 20px; height: 20px; 
-            background: rgba(255,255,255,0.1); color: var(--accent); border-radius: 50%; font-size: 12px; margin-left: 5px; cursor: pointer;
+            display: inline-flex; justify-content: center; align-items: center; width: 18px; height: 18px; 
+            background: rgba(255,255,255,0.1); color: var(--accent); border-radius: 50%; font-size: 11px; margin-left: 5px; cursor: help;
+        }
+        .info-icon:hover::after { 
+            content: attr(data-tooltip); position: absolute; background: #111; color: #fff; padding: 10px; border-radius: 6px; 
+            font-size: 12px; width: 250px; z-index: 9999; margin-top: 25px; border: 1px solid var(--border); box-shadow: 0 5px 15px black;
         }
         
-        /* Modais Responsivos */
+        /* Modais */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 5000; backdrop-filter: blur(4px); justify-content: center; align-items: center; padding: 10px; }
         .modal { 
-            background: var(--card-bg); width: 100%; max-width: 900px; max-height: 90vh; 
+            background: var(--card-bg); width: 100%; max-width: 1000px; max-height: 95vh; 
             border-radius: 12px; border: 1px solid var(--accent); display: flex; flex-direction: column; 
             box-shadow: 0 25px 50px rgba(0,0,0,0.5); animation: fadeIn 0.2s;
         }
-        .modal-header { padding: 15px 20px; background: #181825; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        .modal-header { padding: 15px 20px; background: #181825; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
         .modal-body { padding: 20px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
-        .modal-footer { padding: 15px; border-top: 1px solid var(--border); background: #181825; display: flex; gap: 10px; flex-wrap: wrap; }
+        .modal-footer { padding: 15px; border-top: 1px solid var(--border); background: #181825; display: flex; gap: 10px; justify-content: flex-end; }
 
-        /* Grid Avançado Responsivo */
-        .adv-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 15px; }
+        /* Grid Avançado */
+        .adv-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px; }
         .adv-section { background: rgba(0,0,0,0.2); padding: 15px; border-radius: 8px; border: 1px solid var(--border); }
-        .adv-section h4 { color: var(--info); font-size: 0.9em; text-transform: uppercase; margin-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px; }
+        .adv-section h4 { color: var(--info); font-size: 0.9em; text-transform: uppercase; margin-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px; display: flex; align-items: center; gap: 8px; }
 
-        /* Mini Stats */
-        .mini-stat-group { display: flex; gap: 15px; align-items: center; flex: 1; min-width: 200px; }
-        .mini-stat-item { flex: 1; }
-        .mini-label { font-size: 0.7em; color: #888; display: flex; justify-content: space-between; margin-bottom: 2px; }
-        .mini-track { height: 4px; background: #000; border-radius: 2px; overflow: hidden; }
-        .mini-fill { height: 100%; width: 0%; transition: width 0.3s; }
+        .service-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px; background: rgba(255,255,255,0.02); padding: 5px 10px; border-radius: 4px; }
+        .service-row label { margin: 0; font-size: 0.9em; }
+        .service-row input[type="number"] { width: 70px; padding: 5px; font-size: 0.8em; }
 
         textarea { width: 100%; height: 400px; background: #0b0b12; color: var(--success); border: none; padding: 15px; font-family: monospace; font-size: 13px; resize: none; border-radius: 6px; }
-        
         .verdict-box { padding: 15px; border-radius: 8px; text-align: center; font-weight: bold; margin-top: 15px; }
         .hidden { display: none !important; }
-        
-        /* Ajuste para inputs lado a lado */
         .input-row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-        @media (max-width: 480px) { .input-row { grid-template-columns: 1fr; gap: 10px; } }
+        @media (max-width: 500px) { .input-row { grid-template-columns: 1fr; gap: 10px; } }
     </style>
 </head>
 <body>
@@ -118,10 +115,10 @@
         
         <div style="display:flex; flex-wrap: wrap; justify-content:space-between; align-items:center; gap: 15px;">
             <div>
-                <h1 style="font-size:1.6rem;">MikroTik Architect <span style="font-size:0.5em; background:var(--accent); color:#1e1e2e; padding:2px 6px; border-radius:4px; vertical-align:middle;">v4.1</span></h1>
-                <div style="color:#888; font-size:0.9em;">Planejamento Inteligente & Scripting</div>
+                <h1 style="font-size:1.6rem;">MikroTik Architect <span style="font-size:0.5em; background:var(--accent); color:#1e1e2e; padding:2px 6px; border-radius:4px; vertical-align:middle;">v4.2</span></h1>
+                <div style="color:#888; font-size:0.9em;">Planejamento & Scripting (Full Management)</div>
             </div>
-            <button class="btn btn-adv" style="width:auto;" onclick="openModal('advancedModal')">🛠️ Configurações Avançadas</button>
+            <button class="btn btn-adv" style="width:auto;" onclick="openModal('advancedModal')">🛠️ Avançado</button>
         </div>
 
         <div class="card">
@@ -136,20 +133,20 @@
                 <div>
                     <label>Cenário de Aplicação</label>
                     <select id="scenario" onchange="handleScenarioChange(); calculate();">
-                        <option value="hotspot">🏢 Hotspot (WiFeed / Captive Portal)</option>
+                        <option value="hotspot">🏢 Hotspot (WiFeed / Captive)</option>
                         <option value="domestic">🏠 Doméstico (DHCP Básico)</option>
-                        <option value="corporate">💼 Corporativo (Firewall + Filtros)</option>
+                        <option value="corporate">💼 Corporativo (Firewall)</option>
                     </select>
                 </div>
             </div>
 
             <div class="input-row" style="margin-top:10px;">
                 <div>
-                    <label>Usuários Simultâneos <span class="info-icon" onclick="alert(this.dataset.tooltip)" data-tooltip="Total de dispositivos conectados ao mesmo tempo.">i</span></label>
+                    <label>Usuários Simultâneos <span class="info-icon" data-tooltip="Total de dispositivos conectados.">i</span></label>
                     <input type="number" id="users" value="50" min="1" oninput="calculate()">
                 </div>
                 <div>
-                    <label>Link WAN Total (Mbps) <span class="info-icon" onclick="alert(this.dataset.tooltip)" data-tooltip="Velocidade de internet contratada.">i</span></label>
+                    <label>Link WAN Total (Mbps) <span class="info-icon" data-tooltip="Velocidade contratada.">i</span></label>
                     <input type="number" id="bandwidth" value="200" min="1" oninput="calculate()">
                 </div>
             </div>
@@ -163,8 +160,8 @@
                 <div>
                     <label>Tipo de Conexão</label>
                     <select id="wanType" onchange="toggleWanFields(); calculate();">
-                        <option value="dhcp">DHCP Client (IPoE)</option>
-                        <option value="pppoe">PPPoE Client (Discador)</option>
+                        <option value="dhcp">DHCP Client</option>
+                        <option value="pppoe">PPPoE Client</option>
                         <option value="static">IP Estático</option>
                     </select>
                 </div>
@@ -186,15 +183,17 @@
         <div class="card" style="border-color: var(--accent);">
             <h2 style="margin-bottom:15px; font-size:1.1rem;">📊 Capacidade Real</h2>
             
-            <div class="meter-box">
-                <div class="meter-label"><span>CPU</span> <span id="cpu-text">0%</span></div>
-                <div class="track"><div id="cpu-bar" class="fill low"></div></div>
-                <div style="text-align:right; font-size:0.7em; color:#777; margin-top:3px;" id="cpu-detail"></div>
-            </div>
+            <div id="status-container-main">
+                <div class="meter-box">
+                    <div class="meter-label"><span>CPU</span> <span class="stat-cpu-pct">0%</span></div>
+                    <div class="track"><div class="fill low stat-cpu-bar"></div></div>
+                    <div class="mini-detail stat-cpu-detail">0 pts / 0 pts</div>
+                </div>
 
-            <div class="meter-box">
-                <div class="meter-label"><span>RAM</span> <span id="ram-text">0/0 MB</span></div>
-                <div class="track"><div id="ram-bar" class="fill low"></div></div>
+                <div class="meter-box">
+                    <div class="meter-label"><span>RAM</span> <span class="stat-ram-text">0/0 MB</span></div>
+                    <div class="track"><div class="fill low stat-ram-bar"></div></div>
+                </div>
             </div>
 
             <div id="verdict" class="verdict-box" style="background:var(--input-bg);">...</div>
@@ -211,30 +210,24 @@
 <div class="modal-overlay" id="advancedModal">
     <div class="modal">
         <div class="modal-header">
-            <h3>🛠️ Avançado</h3>
-            
-            <div class="mini-stat-group">
-                <div class="mini-stat-item">
-                    <div class="mini-label"><span>CPU</span><span id="mini-cpu-text">0%</span></div>
-                    <div class="mini-track"><div id="mini-cpu-bar" class="mini-fill" style="background:var(--accent);"></div></div>
-                </div>
-                <div class="mini-stat-item">
-                    <div class="mini-label"><span>RAM</span><span id="mini-ram-text">0%</span></div>
-                    <div class="mini-track"><div id="mini-ram-bar" class="mini-fill" style="background:var(--success);"></div></div>
-                </div>
-            </div>
-            
-            <button onclick="closeModal('advancedModal')" style="background:none; border:none; color:white; font-size:1.5rem; padding:0 10px;">&times;</button>
+            <h3>🛠️ Configurações Avançadas</h3>
+            <button onclick="closeModal('advancedModal')" style="background:none; border:none; color:white; font-size:1.5rem;">&times;</button>
         </div>
+        
+        <div style="padding: 10px 20px; background: rgba(0,0,0,0.2); border-bottom:1px solid var(--border); display:grid; grid-template-columns: 1fr 1fr; gap:20px;">
+            <div id="adv-status-cpu"></div>
+            <div id="adv-status-ram"></div>
+        </div>
+
         <div class="modal-body">
             <div class="adv-grid">
                 
                 <div class="adv-section">
-                    <h4>👤 Usuários</h4>
+                    <h4>👤 Usuários do Sistema</h4>
                     <div id="usersList">
                         <div style="background:rgba(0,0,0,0.3); padding:10px; border-radius:4px; margin-bottom:5px;">
-                            <input type="text" id="adminName" value="liomar" placeholder="User">
-                            <input type="text" id="adminPass" value="Mudar@123" placeholder="Pass">
+                            <input type="text" id="adminName" value="liomar">
+                            <input type="text" id="adminPass" value="Mudar@123">
                             <small style="color:var(--success)">Admin Principal</small>
                         </div>
                     </div>
@@ -246,24 +239,67 @@
                 </div>
 
                 <div class="adv-section">
-                    <h4>🌐 Rede LAN</h4>
+                    <h4>🌐 Rede LAN & Identidade</h4>
                     <label>IP Gateway</label><input type="text" id="lanIp" value="192.168.88.1/24">
                     <label>Pool DHCP</label><input type="text" id="lanPool" value="192.168.88.10-192.168.88.254">
-                    <label>Identity</label><input type="text" id="identityName" value="MikroTik-Router">
+                    <label>Nome do Router (Identity)</label><input type="text" id="identityName" value="MikroTik-Router">
                 </div>
 
                 <div class="adv-section">
-                    <h4>🛡️ Serviços</h4>
-                    <div class="checkbox-wrapper"><input type="checkbox" id="svc_upnp"><label>UPnP</label></div>
-                    <div class="checkbox-wrapper"><input type="checkbox" id="svc_zabbix"><label>Zabbix/SNMP</label></div>
-                    <div class="checkbox-wrapper"><input type="checkbox" id="svc_watchdog" checked><label>Watchdog</label></div>
-                    <div class="checkbox-wrapper"><input type="checkbox" id="svc_tr069"><label>TR-069</label></div>
-                    <label>Auto-Reboot</label>
-                    <select id="autoReboot"><option value="no">Não</option><option value="daily">Diário</option><option value="weekly">Semanal</option></select>
+                    <h4>🛡️ Serviços IP (IP > Services)</h4>
+                    <small style="color:#888; display:block; margin-bottom:10px;">Marque para ATIVAR. Desativados economizam RAM e aumentam segurança.</small>
+                    
+                    <div id="ipServicesContainer">
+                        </div>
                 </div>
 
                 <div class="adv-section">
-                    <h4>🔀 DST-NAT</h4>
+                    <h4>🔧 Ferramentas & Gerenciamento</h4>
+                    
+                    <div class="checkbox-wrapper"><input type="checkbox" id="svc_upnp"><label>UPnP (Jogos)</label></div>
+                    
+                    <div class="checkbox-wrapper">
+                        <input type="checkbox" id="svc_snmp" onchange="toggleToolField('snmpBox')">
+                        <label>SNMP / Zabbix</label>
+                    </div>
+                    <div id="snmpBox" class="hidden" style="margin-left:25px; margin-bottom:10px; border-left:2px solid var(--accent); padding-left:10px;">
+                        <input type="text" id="snmpComm" placeholder="Community (public)">
+                        <input type="text" id="snmpContact" placeholder="Contact">
+                        <input type="text" id="snmpLoc" placeholder="Location">
+                    </div>
+
+                    <div class="checkbox-wrapper">
+                        <input type="checkbox" id="svc_watchdog" checked onchange="toggleToolField('wdBox')">
+                        <label>Watchdog</label>
+                    </div>
+                    <div id="wdBox" style="margin-left:25px; margin-bottom:10px; border-left:2px solid var(--accent); padding-left:10px;">
+                        <input type="text" id="wdAddress" placeholder="Watch Address (ex: 8.8.8.8)">
+                    </div>
+
+                    <div class="checkbox-wrapper">
+                        <input type="checkbox" id="svc_tr069" onchange="toggleToolField('trBox')">
+                        <label>TR-069 Client</label>
+                    </div>
+                    <div id="trBox" class="hidden" style="margin-left:25px; margin-bottom:10px; border-left:2px solid var(--accent); padding-left:10px;">
+                        <input type="text" id="trUrl" placeholder="ACS URL">
+                        <input type="text" id="trUser" placeholder="ACS User">
+                        <input type="text" id="trPass" placeholder="ACS Pass">
+                    </div>
+
+                    <label style="margin-top:10px;">Auto-Reboot</label>
+                    <select id="autoReboot" onchange="toggleToolField('rebootCustomBox', this.value === 'custom')">
+                        <option value="no">Não</option>
+                        <option value="daily">Diário (04:00)</option>
+                        <option value="weekly">Semanal (Dom 04:00)</option>
+                        <option value="custom">Personalizado</option>
+                    </select>
+                    <div id="rebootCustomBox" class="hidden">
+                        <input type="text" id="rebootInterval" placeholder="Intervalo (ex: 30d ou 12:00:00)">
+                    </div>
+                </div>
+
+                <div class="adv-section">
+                    <h4>🔀 Redirecionamento (DST-NAT)</h4>
                     <div id="natList"></div>
                     <div style="display:grid; grid-template-columns: 2fr 1fr 1fr; gap:5px;">
                         <input type="text" id="natIp" placeholder="IP">
@@ -277,9 +313,9 @@
                 <div class="adv-section">
                     <h4>💾 Backup</h4>
                     <div class="checkbox-wrapper"><input type="checkbox" id="bkp_email" onchange="toggleBkp()"><label>Backup E-mail</label></div>
-                    <div id="bkpFields" class="hidden">
+                    <div id="bkpFields" class="hidden" style="margin-left:25px;">
                         <input type="text" id="bkp_to" placeholder="email@destino.com">
-                        <input type="text" id="bkp_smtp" placeholder="smtp.gmail.com">
+                        <input type="text" id="bkp_smtp" placeholder="smtp.server.com">
                     </div>
                 </div>
 
@@ -295,12 +331,14 @@
     <div class="modal" style="max-width:600px;">
         <div class="modal-header">
             <h3>🔍 Ajustes & Monitor</h3>
-            <div class="mini-stat-group" style="max-width:200px;">
-                <div class="mini-stat-item"><div class="mini-track"><div id="dbg-cpu-bar" class="mini-fill" style="background:var(--accent);"></div></div></div>
-                <div class="mini-stat-item"><div class="mini-track"><div id="dbg-ram-bar" class="mini-fill" style="background:var(--success);"></div></div></div>
-            </div>
             <button onclick="closeModal('debugModal')" style="background:none; border:none; color:white; font-size:1.5rem;">&times;</button>
         </div>
+        
+        <div style="padding: 10px 20px; background: rgba(0,0,0,0.2); border-bottom:1px solid var(--border);">
+            <div id="dbg-status-cpu"></div>
+            <div id="dbg-status-ram" style="margin-top:10px;"></div>
+        </div>
+
         <div class="modal-body">
             <label>Perfil de Uso</label>
             <select id="usagePreset" onchange="applyPreset()">
@@ -331,12 +369,23 @@
 </div>
 
 <script>
-    // --- STATE ---
+    // --- DATA ---
     let extraUsers = [];
     let natRules = [];
     let appConfig = { simultaneity: 0.6, cpu_pps_factor: 0.3, fw_weight: 1.5 };
     
-    // --- DB ---
+    // Lista de serviços IP padrão
+    const ipServicesList = [
+        {id: 'api', name: 'API', def: false, port: 8728},
+        {id: 'api-ssl', name: 'API-SSL', def: false, port: 8729},
+        {id: 'ftp', name: 'FTP', def: false, port: 21},
+        {id: 'ssh', name: 'SSH', def: true, port: 22},
+        {id: 'telnet', name: 'Telnet', def: false, port: 23},
+        {id: 'winbox', name: 'Winbox', def: true, port: 8291},
+        {id: 'www', name: 'WWW', def: false, port: 80},
+        {id: 'www-ssl', name: 'WWW-SSL', def: false, port: 443}
+    ];
+
     const hardwareDB = {
         'rb941': { name: 'RB941-2nD (hAP lite)', cpu_score: 100, ram: 32, arch: 'SMIPS', ports: '4x 10/100' },
         'rb750r2': { name: 'RB750r2 (hEX lite)', cpu_score: 130, ram: 64, arch: 'MIPSBE', ports: '5x 10/100' },
@@ -359,6 +408,20 @@
             sel.add(opt);
         }
         
+        // Render IP Services
+        const svcContainer = document.getElementById('ipServicesContainer');
+        ipServicesList.forEach(svc => {
+            svcContainer.innerHTML += `
+            <div class="service-row">
+                <div class="checkbox-wrapper" style="margin:0; padding:0; border:none; background:none;">
+                    <input type="checkbox" id="svc_${svc.id}" ${svc.def ? 'checked' : ''} onchange="calculate()">
+                    <label>${svc.name}</label>
+                </div>
+                <input type="number" id="port_${svc.id}" value="${svc.port}" placeholder="Porta">
+            </div>`;
+        });
+
+        // Setup Debug Values
         document.getElementById('cfg_simult').value = appConfig.simultaneity;
         document.getElementById('cfg_cpu_pps').value = appConfig.cpu_pps_factor;
         
@@ -366,7 +429,7 @@
         calculate();
     }
 
-    // --- LOGIC ---
+    // --- LOGIC UI ---
     function handleScenarioChange() {
         const sc = document.getElementById('scenario').value;
         const container = document.getElementById('dynamicOptions');
@@ -394,7 +457,6 @@
                     <input type="checkbox" id="hs_no_queue" onchange="toggleHsFields(); calculate()">
                     <label>Sem controle de banda (Pass-through)</label>
                 </div>
-                
                 <div id="hsSpeedFields">
                     <label>Plano Médio (Estimativa)</label>
                     <div class="input-row">
@@ -406,7 +468,6 @@
         }
         
         container.innerHTML = html;
-        
         if(document.getElementById('corp_queues')) {
             document.getElementById('corp_queues').addEventListener('change', function() {
                 document.getElementById('corpSpeed').classList.toggle('hidden', !this.checked);
@@ -419,57 +480,58 @@
         const noQueue = document.getElementById('hs_no_queue').checked;
         document.getElementById('hsSpeedFields').classList.toggle('hidden', noQueue);
     }
-
     function toggleWanFields() {
         const type = document.getElementById('wanType').value;
         document.getElementById('pppoeFields').classList.toggle('hidden', type !== 'pppoe');
         document.getElementById('staticFields').classList.toggle('hidden', type !== 'static');
     }
-    
-    function toggleBkp() {
-        document.getElementById('bkpFields').classList.toggle('hidden', !document.getElementById('bkp_email').checked);
+    function toggleBkp() { document.getElementById('bkpFields').classList.toggle('hidden', !document.getElementById('bkp_email').checked); }
+    function toggleToolField(id, force) {
+        let el = document.getElementById(id);
+        // Se force undefined, usa checkbox anterior. Se force defined (auto reboot), usa valor.
+        if (force === undefined) {
+             // Acha o checkbox que disparou o evento? Simplificando: o checkbox pai é irmão anterior
+             // Mas aqui o ID é fixo.
+             let checkId = '';
+             if(id === 'snmpBox') checkId = 'svc_snmp';
+             if(id === 'trBox') checkId = 'svc_tr069';
+             if(id === 'wdBox') checkId = 'svc_watchdog';
+             el.classList.toggle('hidden', !document.getElementById(checkId).checked);
+        } else {
+             el.classList.toggle('hidden', !force);
+        }
+        calculate();
     }
 
-    // --- CORE CALCULATIONS ---
+    // --- CALCULATE ---
     function calculate() {
         const model = hardwareDB[document.getElementById('model').value];
         const scenario = document.getElementById('scenario').value;
         const users = parseInt(document.getElementById('users').value) || 0;
         const bw = parseInt(document.getElementById('bandwidth').value) || 0;
         
-        let effectiveBw = 0;
-        let ppsScore = 0;
-        let ruleScore = 0;
-        let ramUsage = 15; // Base OS
+        let effectiveBw = 0, ppsScore = 0, ruleScore = 0, ramUsage = 15;
 
-        // Determine User Load
+        // User Bandwidth Logic
         let userPlan = 0;
         let ppsFactor = appConfig.cpu_pps_factor;
 
         if (scenario === 'hotspot') {
             if (document.getElementById('hs_no_queue')?.checked) {
-                // Sem controle: Processamento muito mais leve (FastTrack possível ou só routing)
-                userPlan = 20; // Assume alto tráfego se não controla
-                ppsFactor *= 0.4; // Menos CPU por pacote (sem Queue overhead)
+                userPlan = 20; ppsFactor *= 0.4;
             } else {
                 userPlan = (parseInt(document.getElementById('hsDl')?.value)||5) + (parseInt(document.getElementById('hsUl')?.value)||1);
-                ppsFactor *= 1.2; // Overhead de Queues do Hotspot (ou externo via Radius, ainda passa pelo kernel)
+                ppsFactor *= 1.2;
             }
         } else if (scenario === 'corporate') {
             if (document.getElementById('corp_queues')?.checked) {
                 userPlan = (parseInt(document.getElementById('corpDl')?.value)||10) + (parseInt(document.getElementById('corpUl')?.value)||5);
-                ppsFactor *= 1.5; // Queues + Filters
-            } else {
-                userPlan = 3; 
-            }
-        } else {
-            userPlan = 5; // Doméstico
-        }
+                ppsFactor *= 1.5;
+            } else { userPlan = 3; }
+        } else { userPlan = 5; }
 
         let potentialTraf = users * userPlan * appConfig.simultaneity;
         effectiveBw = Math.min(bw, potentialTraf);
-        
-        // CPU Calc
         ppsScore = effectiveBw * ppsFactor;
         if (document.getElementById('wanType').value === 'pppoe') ppsScore *= 1.1;
 
@@ -482,129 +544,207 @@
             ruleScore += (users * filters * appConfig.fw_weight);
         }
         
-        if (document.getElementById('svc_zabbix').checked) ruleScore += 5;
+        // Advanced Tools Weight
+        if (document.getElementById('svc_snmp').checked) ruleScore += 5; // Polling overhead
+        if (document.getElementById('svc_tr069').checked) { ruleScore += 2; ramUsage += 2; }
+        if (document.getElementById('svc_watchdog').checked) ruleScore += 0.5;
         ruleScore += (natRules.length * 2);
 
+        // IP Services Weight (Enabled services use RAM/CPU listeners)
+        ipServicesList.forEach(s => {
+            if (document.getElementById('svc_' + s.id).checked) {
+                ramUsage += 0.2; // Small RAM footprint per service daemon
+            }
+        });
+
         // RAM Calc
-        if (scenario === 'hotspot') ramUsage += (users * 0.45); // Hotspot always eats RAM
+        if (scenario === 'hotspot') ramUsage += (users * 0.45);
         else ramUsage += (users * 0.15);
 
-        // Totals
         let totalCpu = ppsScore + ruleScore;
         let cpuPct = (totalCpu / model.cpu_score) * 100;
         let ramPct = (ramUsage / model.ram) * 100;
 
-        // UI Updates
-        updateBars(cpuPct, ramPct, ramUsage, model.ram);
+        updateAllBars(cpuPct, ramPct, ramUsage, model.ram, totalCpu, model.cpu_score);
         document.getElementById('hw-specs').innerText = `${model.arch} | CPU: ${model.cpu_score} | RAM: ${model.ram}MB`;
-        document.getElementById('cpu-detail').innerText = `${Math.round(totalCpu)} pts / ${model.cpu_score}`;
     }
 
-    function updateBars(cpu, ram, ramVal, ramMax) {
-        setBar('cpu', cpu);
-        setBar('ram', ram, `${Math.round(ramVal)} / ${ramMax} MB`);
-        
-        // Modal Bars
-        setBar('mini-cpu', cpu);
-        setBar('mini-ram', ram);
-        document.getElementById('mini-cpu-text').innerText = Math.round(cpu) + "%";
-        document.getElementById('mini-ram-text').innerText = Math.round(ram) + "%";
-        
-        // Debug Modal Bars
-        setBar('dbg-cpu', cpu);
-        setBar('dbg-ram', ram);
+    function updateAllBars(cpu, ram, ramVal, ramMax, cpuVal, cpuMax) {
+        // Main Sidebar
+        setBar('stat-cpu', cpu, `${Math.round(cpu)}%`);
+        setBar('stat-ram', ram, `${Math.round(ramVal)} / ${ramMax} MB`);
+        document.querySelector('.stat-cpu-detail').innerText = `${Math.round(cpuVal)} pts / ${cpuMax} pts`;
 
+        // Verdict
         const v = document.getElementById('verdict');
-        if (ram > 95 || cpu > 95) {
-            v.innerText = "❌ EXTRAPOLADO (Upgrade Necessário)";
-            v.style.background = "var(--danger)"; v.style.color = "#1e1e2e";
-        } else if (ram > 80 || cpu > 80) {
-            v.innerText = "⚠️ ALERTA (Hardware no Limite)";
-            v.style.background = "var(--warning)"; v.style.color = "#1e1e2e";
-        } else {
-            v.innerText = "✅ ADEQUADO (Estável)";
-            v.style.background = "var(--success)"; v.style.color = "#1e1e2e";
-        }
+        if (ram > 95 || cpu > 95) { v.innerText = "❌ EXTRAPOLADO"; v.style.background = "var(--danger)"; v.style.color = "#1e1e2e"; }
+        else if (ram > 80 || cpu > 80) { v.innerText = "⚠️ ALERTA"; v.style.background = "var(--warning)"; v.style.color = "#1e1e2e"; }
+        else { v.innerText = "✅ ADEQUADO"; v.style.background = "var(--success)"; v.style.color = "#1e1e2e"; }
+
+        // Clone to Modals
+        cloneStatusTo('adv-status-cpu', 'CPU', cpu, `${Math.round(cpuVal)}/${cpuMax} pts`);
+        cloneStatusTo('adv-status-ram', 'RAM', ram, `${Math.round(ramVal)}/${ramMax} MB`);
+        
+        cloneStatusTo('dbg-status-cpu', 'CPU', cpu, `${Math.round(cpuVal)}/${cpuMax} pts`);
+        cloneStatusTo('dbg-status-ram', 'RAM', ram, `${Math.round(ramVal)}/${ramMax} MB`);
     }
 
-    function setBar(id, pct, text) {
-        let el = document.getElementById(id + '-bar');
-        let txt = document.getElementById(id + '-text');
-        let vp = Math.min(pct, 100);
-        if(el) {
-            el.style.width = vp + "%";
-            el.className = id.includes('mini') || id.includes('dbg') ? 'mini-fill' : 'fill';
-            if(!id.includes('mini') && !id.includes('dbg')) {
-                el.classList.add(pct < 60 ? 'low' : pct < 85 ? 'med' : 'high');
+    function cloneStatusTo(containerId, label, pct, detail) {
+        const el = document.getElementById(containerId);
+        if(!el) return;
+        el.innerHTML = `
+        <div class="meter-box" style="margin-top:0; border-color:#555;">
+            <div class="meter-label"><span>${label}</span> <span>${Math.round(pct)}%</span></div>
+            <div class="track"><div class="fill ${pct < 60 ? 'low' : pct < 85 ? 'med' : 'high'}" style="width:${Math.min(pct,100)}%"></div></div>
+            <div class="mini-detail">${detail}</div>
+        </div>`;
+    }
+
+    function setBar(prefix, pct, text) {
+        const bar = document.querySelector(`.${prefix}-bar`);
+        const lbl = document.querySelector(`.${prefix}-text`) || document.querySelector(`.${prefix}-pct`);
+        if(bar) {
+            bar.style.width = Math.min(pct, 100) + "%";
+            bar.className = `fill ${prefix}-bar ${pct < 60 ? 'low' : pct < 85 ? 'med' : 'high'}`;
+        }
+        if(lbl) lbl.innerText = text;
+    }
+
+    // --- SCRIPT GENERATOR ---
+    function generateAndShowScript() {
+        const scenario = document.getElementById('scenario').value;
+        const identity = document.getElementById('identityName').value;
+        const wan = document.getElementById('wanType').value;
+        const lanIp = document.getElementById('lanIp').value;
+        const lanPool = document.getElementById('lanPool').value;
+        
+        let s = `# Script Gerado pelo MikroTik Architect v4.2\n`;
+        s += `/system identity set name="${identity}"\n\n`;
+
+        // 1. IP Services
+        s += `# --- SERVIÇOS IP ---\n`;
+        ipServicesList.forEach(svc => {
+            const active = document.getElementById('svc_' + svc.id).checked;
+            const port = document.getElementById('port_' + svc.id).value;
+            if (!active) {
+                s += `/ip service disable ${svc.id}\n`;
             } else {
-                el.style.backgroundColor = pct < 60 ? 'var(--success)' : pct < 85 ? 'var(--warning)' : 'var(--danger)';
+                s += `/ip service enable ${svc.id}\n`;
+                if (port != svc.port) s += `/ip service set ${svc.id} port=${port}\n`;
             }
+        });
+        s += `\n`;
+
+        // 2. Management Tools
+        s += `# --- FERRAMENTAS ---\n`;
+        
+        // SNMP
+        if (document.getElementById('svc_snmp').checked) {
+            let comm = document.getElementById('snmpComm').value || 'public';
+            let cont = document.getElementById('snmpContact').value;
+            let loc = document.getElementById('snmpLoc').value;
+            s += `/snmp set enabled=yes contact="${cont}" location="${loc}"\n`;
+            s += `/snmp community set [find default=yes] name="${comm}"\n`;
+        } else { s += `/snmp set enabled=no\n`; }
+
+        // Watchdog
+        if (document.getElementById('svc_watchdog').checked) {
+            let wd = document.getElementById('wdAddress').value;
+            s += `/system watchdog set watchdog-timer=yes${wd ? ' watch-address='+wd : ''}\n`;
+        } else { s += `/system watchdog set watchdog-timer=no\n`; }
+
+        // TR-069
+        if (document.getElementById('svc_tr069').checked) {
+            let url = document.getElementById('trUrl').value;
+            let u = document.getElementById('trUser').value;
+            let p = document.getElementById('trPass').value;
+            s += `/tr069-client set enabled=yes acs-url="${url}" acs-username="${u}" acs-password="${p}"\n`;
         }
-        if(txt) txt.innerText = text || Math.round(pct) + "%";
+
+        // Reboot
+        let reb = document.getElementById('autoReboot').value;
+        if (reb !== 'no') {
+            let interval = (reb === 'daily') ? '1d' : (reb === 'weekly') ? '7d' : document.getElementById('rebootInterval').value;
+            s += `/system scheduler add name="AutoReboot" interval=${interval} on-event="/system reboot"\n`;
+        }
+
+        // 3. Users
+        s += `\n# --- USUÁRIOS ---\n`;
+        s += `/user add name="${document.getElementById('adminName').value}" password="${document.getElementById('adminPass').value}" group=full comment="Admin"\n`;
+        if(document.getElementById('removeDefaultAdmin').checked) s += `/user remove [find name="admin"]\n`;
+        extraUsers.forEach(u => s += `/user add name="${u.name}" password="${u.pass}" group=read comment="Extra"\n`);
+
+        // 4. Basic Network (WAN/LAN)
+        s += `\n# --- REDE ---\n`;
+        s += `/interface bridge add name="bridge-LAN"\n`;
+        // Generic ports
+        s += `/interface list add name=WAN\n/interface list add name=LAN\n`;
+        
+        if (wan === 'dhcp') {
+            s += `/ip dhcp-client add interface=ether1 disabled=no\n/interface list member add interface=ether1 list=WAN\n`;
+        } else if (wan === 'pppoe') {
+            let u = document.getElementById('pppoeUser').value;
+            let p = document.getElementById('pppoePass').value;
+            s += `/interface pppoe-client add name="pppoe-out1" interface=ether1 user="${u}" password="${p}" add-default-route=yes use-peer-dns=yes disabled=no\n`;
+            s += `/interface list member add interface=pppoe-out1 list=WAN\n`;
+        } else {
+             let ip = document.getElementById('staticIP').value;
+             let gw = document.getElementById('staticGW').value;
+             s += `/ip address add address=${ip} interface=ether1\n/ip route add gateway=${gw}\n/interface list member add interface=ether1 list=WAN\n`;
+        }
+        s += `/interface list member add interface=bridge-LAN list=LAN\n`;
+        s += `/ip address add address=${lanIp} interface=bridge-LAN\n`;
+        s += `/ip pool add name=dhcp_pool ranges=${lanPool}\n`;
+        s += `/ip dhcp-server add name=dhcp1 interface=bridge-LAN address-pool=dhcp_pool disabled=no\n`;
+        s += `/ip dhcp-server network add address=${lanIp.replace('/24','.0/24')} gateway=${lanIp.split('/')[0]} dns-server=8.8.8.8,1.1.1.1\n`;
+        s += `/ip firewall nat add action=masquerade chain=srcnat out-interface-list=WAN\n`;
+
+        // 5. DST-NAT
+        if(natRules.length > 0) {
+            s += `\n# --- PORT FORWARDING ---\n`;
+            natRules.forEach(r => s += `/ip firewall nat add action=dst-nat chain=dstnat dst-port=${r.port} protocol=${r.proto} to-addresses=${r.ip} to-ports=${r.port} in-interface-list=WAN comment="${r.comment}"\n`);
+        }
+
+        document.getElementById('finalScript').value = s;
+        openModal('scriptModal');
     }
 
-    // --- UTILS ---
-    function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+    // --- MODAL UTILS ---
+    function openModal(id) { document.getElementById(id).style.display = 'flex'; calculate(); }
     function closeModal(id) { document.getElementById(id).style.display = 'none'; }
-    
     function addExtraUser() {
         const name = prompt("Nome:"); const pass = prompt("Senha:");
         if(name && pass) { extraUsers.push({name, pass}); renderExtras(); }
     }
-    
     function renderExtras() {
         const div = document.getElementById('usersList');
-        // Reset to default
-        div.innerHTML = `<div style="background:rgba(0,0,0,0.3); padding:10px; border-radius:4px; margin-bottom:5px;">
-                            <input type="text" id="adminName" value="liomar">
-                            <input type="text" id="adminPass" value="Mudar@123">
-                            <small style="color:var(--success)">Admin Principal</small>
-                        </div>`;
-        extraUsers.forEach((u, idx) => {
-            div.innerHTML += `<div style="background:#2a2a35; padding:8px; margin-top:5px; border-radius:4px; display:flex; justify-content:space-between;"><span>${u.name}</span> <span style="color:red;" onclick="extraUsers.splice(${idx},1); renderExtras()">[X]</span></div>`;
-        });
+        div.innerHTML = `<div style="background:rgba(0,0,0,0.3); padding:10px; border-radius:4px; margin-bottom:5px;"><input type="text" id="adminName" value="liomar"><input type="text" id="adminPass" value="Mudar@123"><small style="color:var(--success)">Admin Principal</small></div>`;
+        extraUsers.forEach((u, idx) => div.innerHTML += `<div style="background:#2a2a35; padding:8px; margin-top:5px; border-radius:4px; display:flex; justify-content:space-between;"><span>${u.name}</span> <span style="color:red;" onclick="extraUsers.splice(${idx},1); renderExtras()">[X]</span></div>`);
     }
-
     function addNatRule() {
-        const ip = document.getElementById('natIp').value;
-        const port = document.getElementById('natPort').value;
-        const proto = document.getElementById('natProto').value;
-        const comment = document.getElementById('natComment').value;
+        const ip = document.getElementById('natIp').value; const port = document.getElementById('natPort').value;
+        const proto = document.getElementById('natProto').value; const comment = document.getElementById('natComment').value;
         if(ip && port) { natRules.push({ip, port, proto, comment}); renderNat(); calculate(); }
     }
-
     function renderNat() {
         const d = document.getElementById('natList'); d.innerHTML = '';
-        natRules.forEach((r, idx) => {
-            d.innerHTML += `<div style="font-size:0.8em; border-bottom:1px solid #333; padding:5px;">${r.port}/${r.proto} -> ${r.ip} <span style="color:red;" onclick="natRules.splice(${idx},1); renderNat(); calculate()">[x]</span></div>`;
-        });
+        natRules.forEach((r, idx) => d.innerHTML += `<div style="font-size:0.8em; border-bottom:1px solid #333; padding:5px;">${r.port}/${r.proto} -> ${r.ip} <span style="color:red;" onclick="natRules.splice(${idx},1); renderNat(); calculate()">[x]</span></div>`);
     }
-
     function applyPreset() {
         const p = document.getElementById('usagePreset').value;
         if(p==='wifi'){appConfig.simultaneity=0.5;appConfig.cpu_pps_factor=0.45;}
         else if(p==='cabled'){appConfig.simultaneity=0.7;appConfig.cpu_pps_factor=0.25;}
         else if(p==='heavy'){appConfig.simultaneity=0.9;appConfig.cpu_pps_factor=0.5;}
         else {appConfig.simultaneity=0.6;appConfig.cpu_pps_factor=0.3;}
-        
         document.getElementById('cfg_simult').value = appConfig.simultaneity;
         document.getElementById('cfg_cpu_pps').value = appConfig.cpu_pps_factor;
         calculate();
     }
-    
     function updateConfig() {
         appConfig.simultaneity = parseFloat(document.getElementById('cfg_simult').value);
         appConfig.cpu_pps_factor = parseFloat(document.getElementById('cfg_cpu_pps').value);
         calculate();
     }
-    
-    function generateAndShowScript() {
-        // ... (Mesma lógica de geração da v4.0, omitida por brevidade mas funcional igual)
-        // Apenas para demonstração visual, preenchemos o textarea
-        document.getElementById('finalScript').value = "# Script gerado com sucesso. (Lógica completa na v4.0)\n/system identity set name=" + document.getElementById('identityName').value;
-        openModal('scriptModal');
-    }
-    
     function copyToClipboard() { navigator.clipboard.writeText(document.getElementById('finalScript').value); }
     function downloadScript() { 
         const blob = new Blob([document.getElementById('finalScript').value], {type: "text/plain"});
