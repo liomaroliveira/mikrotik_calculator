@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>MikroTik Architect v5.5</title>
+    <title>MikroTik Architect v5.7</title>
     <meta name="description" content="Calculadora de dimensionamento de hardware MikroTik e gerador de script.">
     <style>
         :root {
@@ -24,7 +24,7 @@
             --danger: #ef4444;
 
             /* Dimensions */
-            --mobile-footer-height: 80px; /* Aumentado para caber mais infos */
+            --mobile-footer-height: 85px;
         }
 
         * { box-sizing: border-box; outline: none; -webkit-tap-highlight-color: transparent; }
@@ -156,6 +156,14 @@
         }
         .input-icon-wrapper input { padding-left: 36px; }
 
+        /* Password Toggle */
+        .pass-wrapper { position: relative; }
+        .pass-toggle-btn {
+            position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+            cursor: pointer; opacity: 0.7; font-size: 1.1rem; user-select: none;
+        }
+        .pass-toggle-btn:hover { opacity: 1; color: var(--primary); }
+
         /* Custom Checkbox */
         .checkbox-item {
             display: flex;
@@ -206,23 +214,36 @@
         .btn-danger { background: rgba(239, 68, 68, 0.1); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.2); }
         .btn-sm { padding: 8px 16px; font-size: 0.85rem; width: auto; }
 
-        /* --- Alerts --- */
-        .alert-upgrade {
-            background: rgba(239, 68, 68, 0.15);
-            border: 1px solid var(--danger);
-            color: #fca5a5;
-            padding: 12px;
-            border-radius: 8px;
+        /* --- Upgrade Popup --- */
+        .upgrade-popup-container {
+            position: absolute;
+            bottom: 100%;
+            left: 0;
+            width: 100%;
             margin-bottom: 15px;
-            font-size: 0.85rem;
+            z-index: 100;
+        }
+
+        .upgrade-popup {
+            background: rgba(31, 41, 55, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--danger);
+            border-radius: 12px;
+            padding: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
             display: flex;
             align-items: center;
             justify-content: space-between;
-            animation: pulse-red 2s infinite;
             cursor: pointer;
+            animation: bounceIn 0.5s;
         }
-        .alert-upgrade:hover { background: rgba(239, 68, 68, 0.25); }
-        @keyframes pulse-red { 0% {box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);} 70% {box-shadow: 0 0 0 6px rgba(239, 68, 68, 0);} 100% {box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);} }
+        
+        .upgrade-popup strong { color: var(--danger); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; display: block; }
+        .upgrade-popup span { color: #fff; font-size: 0.9rem; font-weight: 600; }
+        .upgrade-popup .arrow { font-size: 1.2rem; color: var(--primary); animation: slideRight 1s infinite alternate; }
+
+        @keyframes bounceIn { 0% { opacity: 0; transform: translateY(10px); } 100% { opacity: 1; transform: translateY(0); } }
+        @keyframes slideRight { 0% { transform: translateX(0); } 100% { transform: translateX(5px); } }
 
         /* --- Sidebar & Stats --- */
         .sidebar {
@@ -237,8 +258,34 @@
 
         .meter-container { margin-bottom: 15px; }
         .meter-header { display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 6px; font-weight: 600; }
-        .meter-track { height: 10px; background: #131620; border-radius: 5px; overflow: hidden; }
-        .meter-fill { height: 100%; width: 0%; border-radius: 5px; transition: width 0.4s ease, background-color 0.4s ease; }
+        
+        /* New Animated Bar Styles */
+        .meter-track { height: 12px; background: #131620; border-radius: 6px; overflow: hidden; position: relative; }
+        
+        .meter-fill { 
+            height: 100%; 
+            border-radius: 6px; 
+            transition: width 0.5s ease-out; 
+            background-size: 20px 20px;
+            background-image: linear-gradient(
+                45deg, 
+                rgba(255, 255, 255, 0.15) 25%, 
+                transparent 25%, 
+                transparent 50%, 
+                rgba(255, 255, 255, 0.15) 50%, 
+                rgba(255, 255, 255, 0.15) 75%, 
+                transparent 75%, 
+                transparent
+            );
+        }
+
+        .meter-fill.green { background-color: var(--success); animation: flow 2s linear infinite; }
+        .meter-fill.yellow { background-color: var(--warning); animation: flow 0.8s linear infinite; }
+        .meter-fill.red { background-color: var(--danger); animation: flow 0.4s linear infinite, pulse 1.5s infinite; }
+
+        @keyframes flow { 0% { background-position: 0 0; } 100% { background-position: 20px 20px; } }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); } 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); } }
+
         .meter-detail { font-size: 0.75rem; color: var(--text-muted); text-align: right; margin-top: 4px; }
 
         .verdict {
@@ -252,6 +299,7 @@
             margin-top: 20px;
             background: var(--bg-input);
             color: var(--text-muted);
+            position: relative; /* For popup positioning */
         }
         .verdict.ok { background: rgba(16, 185, 129, 0.2); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.3); }
         .verdict.warn { background: rgba(245, 158, 11, 0.2); color: var(--warning); border: 1px solid rgba(245, 158, 11, 0.3); }
@@ -285,12 +333,16 @@
             position: relative;
             display: flex; align-items: center; justify-content: center;
             width: 50px; cursor: pointer;
+            z-index: 2001; /* Ensure higher than stats */
         }
         .mf-verdict-tooltip {
-            position: absolute; bottom: 100%; left: 0;
-            background: #333; color: white; padding: 5px 10px;
-            border-radius: 4px; font-size: 0.75rem; white-space: nowrap;
-            display: none; pointer-events: none; margin-bottom: 10px;
+            position: absolute; bottom: 110%; left: 0;
+            background: #23273a; color: white; padding: 6px 12px;
+            border-radius: 6px; font-size: 0.8rem; white-space: nowrap;
+            display: none; pointer-events: none; margin-bottom: 5px;
+            border: 1px solid var(--border);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            z-index: 3000; /* Highest priority */
         }
         .mf-verdict-wrapper:hover .mf-verdict-tooltip, .mf-verdict-wrapper:active .mf-verdict-tooltip { display: block; }
 
@@ -308,8 +360,7 @@
         .mf-main-val { font-size: 0.8rem; font-weight: 700; color: var(--text-main); }
         .mf-sub-val { font-size: 0.65rem; color: var(--text-muted); }
 
-        .mf-track { height: 6px; background: #333; border-radius: 3px; width: 100%; }
-        .mf-fill { height: 100%; border-radius: 3px; width: 0%; transition: width 0.3s; }
+        .mf-track { height: 8px; background: #333; border-radius: 4px; width: 100%; overflow: hidden; } /* Overrides standard for mobile */
         .mf-verdict { font-size: 1.5rem; }
 
         /* --- Utilities --- */
@@ -359,7 +410,7 @@
     <!-- Header Area -->
     <header class="header">
         <div class="brand">
-            <h1>MikroTik Architect <span class="version-tag">v5.5</span></h1>
+            <h1>MikroTik Architect <span class="version-tag">v5.7</span></h1>
             <div style="font-size: 0.9rem; color: var(--text-muted);">Planejamento & Scripting (Full Management)</div>
         </div>
         <button class="btn btn-secondary btn-sm" onclick="openModal('advancedModal')">
@@ -373,9 +424,7 @@
         <div class="card">
             <h2>1. Definição do Cenário</h2>
             
-            <!-- Grid Layout Desktop: Modelo e Cenário lado a lado -->
             <div class="form-grid">
-                <!-- Col 1: Modelo -->
                 <div class="form-group">
                     <label>Modelo do Equipamento</label>
                     <select id="model" onchange="App.calculate()">
@@ -384,7 +433,6 @@
                     <div id="hw-specs" style="font-size:0.8rem; color:var(--primary); margin-top:6px; font-weight:500; line-height: 1.3;">...</div>
                 </div>
 
-                <!-- Col 2: Cenário -->
                 <div class="form-group">
                     <label>Cenário de Aplicação</label>
                     <select id="scenario" onchange="App.handleScenarioChange()">
@@ -392,12 +440,10 @@
                         <option value="domestic">🏠 Doméstico (DHCP Básico)</option>
                         <option value="corporate">💼 Corporativo (Firewall)</option>
                     </select>
-                    <!-- Perfil ativo abaixo do cenário -->
                     <div id="activeProfileLabel" class="profile-badge">Perfil: Padrão</div>
                 </div>
             </div>
 
-            <!-- Grid: Usuários e Link -->
             <div class="form-grid">
                 <div class="form-group">
                     <label>Usuários Simultâneos <span class="info-tip" title="Total de dispositivos conectados.">i</span></label>
@@ -420,13 +466,13 @@
                 <div class="form-group">
                     <label>Tipo de Conexão</label>
                     <select id="wanType" onchange="App.toggleWanFields()">
+                        <option value="pppoe" selected>PPPoE Client</option>
                         <option value="dhcp">DHCP Client</option>
-                        <option value="pppoe">PPPoE Client</option>
                         <option value="static">IP Estático</option>
                     </select>
                 </div>
                 
-                <div id="pppoeFields" class="hidden" style="grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <div id="pppoeFields" style="grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                     <div class="form-group"><label>Usuário</label><input type="text" id="pppoeUser" placeholder="Usuário PPPoE"></div>
                     <div class="form-group"><label>Senha</label><input type="password" id="pppoePass" placeholder="Senha PPPoE"></div>
                 </div>
@@ -445,15 +491,6 @@
     <aside class="sidebar">
         <div class="card" style="border-color: var(--primary-glow);">
             <h2 style="color: var(--primary);">📊 Capacidade Real</h2>
-            
-            <!-- Upgrade Alert -->
-            <div id="upgrade-alert" class="alert-upgrade hidden" onclick="App.upgradeModel()">
-                <div>
-                    <strong>⚠️ UPGRADE NECESSÁRIO</strong><br>
-                    <span id="upgrade-msg">Sugestão: ...</span>
-                </div>
-                <div style="font-size:1.2rem">↗️</div>
-            </div>
 
             <div class="meter-container">
                 <div class="meter-header">
@@ -461,7 +498,7 @@
                     <span id="lbl-cpu">0%</span>
                 </div>
                 <div class="meter-track">
-                    <div id="bar-cpu" class="meter-fill" style="background: var(--success);"></div>
+                    <div id="bar-cpu" class="meter-fill green"></div>
                 </div>
                 <div class="meter-detail" id="det-cpu">0 pts</div>
             </div>
@@ -469,17 +506,27 @@
             <div class="meter-container">
                 <div class="meter-header">
                     <span>RAM</span>
-                    <span id="lbl-ram">0/0 MB</span>
+                    <span id="lbl-ram">0 MB 0%</span>
                 </div>
                 <div class="meter-track">
-                    <div id="bar-ram" class="meter-fill" style="background: var(--success);"></div>
+                    <div id="bar-ram" class="meter-fill green"></div>
                 </div>
+                <div class="meter-detail" id="det-ram">0 MB Livres</div>
             </div>
 
-            <div id="verdict-box" class="verdict ok">✅ ADEQUADO</div>
-            
-            <div style="margin-top:15px; display:flex; gap:10px;">
-                <button class="btn btn-ghost" style="flex:1" onclick="openModal('advancedModal')">🔍 Ajustes & Debug</button>
+            <!-- Verdict & Popup Container -->
+            <div style="position:relative;">
+                <div id="upgrade-popup" class="upgrade-popup-container hidden" onclick="App.upgradeModel()">
+                    <div class="upgrade-popup">
+                        <div>
+                            <strong>⚠️ Upgrade Sugerido</strong>
+                            <span id="upgrade-msg-txt">RBxxxx</span>
+                        </div>
+                        <i class="arrow">➜</i>
+                    </div>
+                </div>
+                
+                <div id="verdict-box" class="verdict ok">✅ ADEQUADO</div>
             </div>
         </div>
 
@@ -492,33 +539,38 @@
 
 <!-- MOBILE STICKY FOOTER -->
 <div class="mobile-footer">
-    <!-- Status Icon + Tooltip -->
     <div class="mf-verdict-wrapper">
+        <!-- Upgrade Popup Mobile -->
+        <div id="mob-upgrade-popup" style="position:absolute; bottom:120%; left:0; width:200px; display:none; z-index:2000;" onclick="App.upgradeModel()">
+            <div class="upgrade-popup">
+                <div>
+                    <strong>⚠️ Sugestão</strong>
+                    <span id="mob-upgrade-msg-txt">...</span>
+                </div>
+                <i class="arrow">➜</i>
+            </div>
+        </div>
+        
         <span id="mob-verdict-icon" class="mf-verdict">✅</span>
         <div id="mob-verdict-tooltip" class="mf-verdict-tooltip">Adequado</div>
     </div>
     
-    <!-- Upgrade Alert Mobile (Small) -->
-    <div id="mob-upgrade-alert" class="alert-upgrade hidden" style="margin:0 10px; padding: 5px; font-size:0.7rem;" onclick="App.upgradeModel()">
-        <span>↗️ Upgrade Sugerido</span>
-    </div>
-
     <div class="mf-stats">
         <!-- CPU Mob -->
         <div class="mf-stat-item">
             <div class="mf-label-row">
                 <span class="mf-main-val" id="mob-lbl-cpu-main">0%</span>
             </div>
-            <div class="mf-track"><div id="mob-bar-cpu" class="mf-fill" style="background: var(--success);"></div></div>
-            <div class="mf-sub-val" id="mob-lbl-cpu-sub">0 / 0 pts</div>
+            <div class="mf-track"><div id="mob-bar-cpu" class="meter-fill green"></div></div>
+            <div class="mf-sub-val" id="mob-lbl-cpu-sub">0 pts</div>
         </div>
         <!-- RAM Mob -->
         <div class="mf-stat-item">
             <div class="mf-label-row">
-                <span class="mf-main-val" id="mob-lbl-ram-main">0%</span>
+                <span class="mf-main-val" id="mob-lbl-ram-main">0 MB 0%</span>
             </div>
-            <div class="mf-track"><div id="mob-bar-ram" class="mf-fill" style="background: var(--success);"></div></div>
-            <div class="mf-sub-val" id="mob-lbl-ram-sub">0 used / 0 free</div>
+            <div class="mf-track"><div id="mob-bar-ram" class="meter-fill green"></div></div>
+            <div class="mf-sub-val" id="mob-lbl-ram-sub">0 MB Livres</div>
         </div>
     </div>
 
@@ -535,18 +587,18 @@
             <button class="btn-ghost" style="width:auto; padding:5px 10px;" onclick="closeModal('advancedModal')">✕</button>
         </div>
         
-        <!-- Live Status in Modal (Same mobile structure) -->
+        <!-- Live Status in Modal -->
         <div style="padding: 15px 20px; background: rgba(0,0,0,0.3); border-bottom:1px solid var(--border); display:flex;">
              <div class="mf-stats" style="margin:0">
                 <div class="mf-stat-item">
                     <div class="mf-label-row"><span class="mf-main-val" id="adv-lbl-cpu-main">0%</span></div>
-                    <div class="mf-track"><div id="adv-bar-cpu" class="meter-fill" style="background: var(--success);"></div></div>
-                    <div class="mf-sub-val" id="adv-lbl-cpu-sub">0 / 0 pts</div>
+                    <div class="mf-track"><div id="adv-bar-cpu" class="meter-fill green"></div></div>
+                    <div class="mf-sub-val" id="adv-lbl-cpu-sub">0 pts</div>
                 </div>
                 <div class="mf-stat-item" style="margin-left:15px">
                     <div class="mf-label-row"><span class="mf-main-val" id="adv-lbl-ram-main">0%</span></div>
-                    <div class="mf-track"><div id="adv-bar-ram" class="meter-fill" style="background: var(--success);"></div></div>
-                    <div class="mf-sub-val" id="adv-lbl-ram-sub">0 used / 0 free</div>
+                    <div class="mf-track"><div id="adv-bar-ram" class="meter-fill green"></div></div>
+                    <div class="mf-sub-val" id="adv-lbl-ram-sub">0 MB Livres</div>
                 </div>
              </div>
         </div>
@@ -560,7 +612,10 @@
                     <div id="usersList">
                         <div style="background:rgba(255,255,255,0.05); padding:10px; border-radius:4px; margin-bottom:5px;">
                             <input type="text" id="adminName" value="liomar" placeholder="User" style="margin-bottom:5px;">
-                            <input type="text" id="adminPass" value="Mudar@123" placeholder="Pass">
+                            <div class="pass-wrapper">
+                                <input type="password" id="adminPass" value="Mudar@123" placeholder="Pass" style="padding-right: 30px;">
+                                <span class="pass-toggle-btn" onclick="App.togglePass('adminPass', this)">👁️</span>
+                            </div>
                             <small style="color:var(--success); display:block; margin-top:4px;">Admin Principal</small>
                         </div>
                     </div>
@@ -578,13 +633,46 @@
                         <label>Nome do Router (Identity)</label>
                         <input type="text" id="identityName" value="MikroTik-Router">
                     </div>
-                    <div class="form-group">
-                        <label>IP LAN / Máscara</label>
-                        <input type="text" id="lanIp" value="192.168.88.1/24" oninput="App.autoCalcPool(this.value)">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>IP Gateway LAN</label>
+                            <input type="text" id="lanIp" value="192.168.88.1" oninput="App.updateLanPool()">
+                        </div>
+                        <div class="form-group">
+                            <label>Máscara (CIDR)</label>
+                            <select id="lanMask" onchange="App.updateLanPool()">
+                                <option value="8">/8</option>
+                                <option value="16">/16</option>
+                                <option value="20">/20</option>
+                                <option value="21">/21</option>
+                                <option value="22">/22</option>
+                                <option value="23">/23</option>
+                                <option value="24" selected>/24</option>
+                                <option value="25">/25</option>
+                                <option value="26">/26</option>
+                                <option value="27">/27</option>
+                                <option value="28">/28</option>
+                                <option value="29">/29</option>
+                                <option value="30">/30</option>
+                            </select>
+                        </div>
                     </div>
                     <div class="form-group">
-                        <label>Pool DHCP</label>
-                        <input type="text" id="lanPool" value="192.168.88.10-192.168.88.254">
+                        <label>Pool DHCP (Auto)</label>
+                        <input type="text" id="lanPool" value="192.168.88.10-192.168.88.254" readonly style="background:rgba(0,0,0,0.2); cursor:not-allowed;">
+                    </div>
+                    <div class="form-group">
+                        <label>Lease Time LAN</label>
+                        <select id="lanLeaseTime" onchange="App.calculate()">
+                            <option value="10">10 Minutos</option>
+                            <option value="30">30 Minutos</option>
+                            <option value="60" selected>1 Hora</option>
+                            <option value="120">2 Horas</option>
+                            <option value="180">3 Horas</option>
+                            <option value="360">6 Horas</option>
+                            <option value="720">12 Horas</option>
+                            <option value="1440">24 Horas</option>
+                        </select>
                     </div>
                 </div>
 
@@ -665,7 +753,7 @@
                     </div>
                 </div>
                 
-                <!-- Section: Perfis de Uso (Previously Debug Modal) -->
+                <!-- Section: Perfis de Uso -->
                 <div class="adv-section">
                     <h4>⚙️ Perfis de Uso</h4>
                     <div class="form-group">
@@ -717,10 +805,9 @@
 
 <script>
 /**
- * MikroTik Architect v5.5
- * - Auto-calc DHCP logic update
- * - Layout Refactoring
- * - Upgrade Suggestion Logic
+ * MikroTik Architect v5.7
+ * - Features: Auto LAN Pool, FastTrack Logic, Animated Meters, Upgrade Popup
+ * - Changes: Decoupled Verdict Updates, Mobile Tooltip Fix, Password Toggle
  */
 const App = (function() {
     
@@ -729,6 +816,7 @@ const App = (function() {
     let natRules = [];
     let appConfig = { simultaneity: 0.6, cpu_pps_factor: 0.3, fw_weight: 1.5 };
     let currentSuggestedModel = null;
+    let sortedHardwareKeys = [];
 
     const ipServicesList = [
         {id: 'api', name: 'API', def: false, port: 8728},
@@ -741,8 +829,6 @@ const App = (function() {
         {id: 'www-ssl', name: 'WWW-SSL', def: false, port: 443}
     ];
 
-    // Hardware DB - Sorted array for Upgrade logic would be easier, 
-    // but object is cleaner for lookup. We will create a sorted reference on init.
     const hardwareDB = {
         'rb941': { name: 'RB941-2nD (hAP lite)', cpu_score: 100, ram: 32, arch: 'SMIPS', ports: '4x 10/100' },
         'rb750r2': { name: 'RB750r2 (hEX lite)', cpu_score: 130, ram: 64, arch: 'MIPSBE', ports: '5x 10/100' },
@@ -756,73 +842,91 @@ const App = (function() {
         'ccr1036': { name: 'CCR1036-8G-2S+', cpu_score: 28000, ram: 4096, arch: 'TILE', ports: '8x Giga + 2x SFP+' }
     };
 
-    let sortedHardwareKeys = [];
-
     // --- Private Methods ---
     function getEl(id) { return document.getElementById(id); }
     function getVal(id) { return getEl(id) ? getEl(id).value : ''; }
     function getInt(id) { return parseInt(getVal(id)) || 0; }
     function isChecked(id) { const el = getEl(id); return el ? el.checked : false; }
 
+    function setText(id, text) {
+        const el = getEl(id);
+        if (el) el.innerText = text;
+    }
+
     function updateBar(elementId, labelId, current, max, suffix) {
         const pct = Math.min((current / max) * 100, 100);
         const el = getEl(elementId);
-        const lbl = getEl(labelId);
+        
         if (el) {
             el.style.width = `${pct}%`;
-            if (pct < 60) el.style.background = 'var(--success)';
-            else if (pct < 85) el.style.background = 'var(--warning)';
-            else el.style.background = 'var(--danger)';
+            el.className = 'meter-fill'; // reset
+            if (pct < 60) el.classList.add('green');
+            else if (pct < 85) el.classList.add('yellow');
+            else el.classList.add('red');
         }
-        if (lbl) lbl.innerText = suffix ? suffix : `${Math.round(pct)}%`;
     }
 
     // --- Public Interface ---
     function init() {
-        // Sort hardware by CPU score for upgrade logic
         sortedHardwareKeys = Object.keys(hardwareDB).sort((a,b) => hardwareDB[a].cpu_score - hardwareDB[b].cpu_score);
 
-        // Render Hardware List
         const sel = getEl('model');
-        sortedHardwareKeys.forEach(key => {
-            let opt = document.createElement('option');
-            opt.value = key;
-            opt.innerText = hardwareDB[key].name;
-            if(key === 'rb750gr3') opt.selected = true;
-            sel.appendChild(opt);
-        });
+        if (sel) {
+            sortedHardwareKeys.forEach(key => {
+                let opt = document.createElement('option');
+                opt.value = key;
+                opt.innerText = hardwareDB[key].name;
+                if(key === 'rb750gr3') opt.selected = true;
+                sel.appendChild(opt);
+            });
+        }
 
-        // Render IP Services
         const svcContainer = getEl('ipServicesContainer');
-        ipServicesList.forEach(svc => {
-            svcContainer.innerHTML += `
-            <div style="display:flex; align-items:center; justify-content:space-between; background:rgba(255,255,255,0.03); padding:5px 10px; border-radius:4px;">
-                <div class="checkbox-item" style="margin:0; padding:0; background:none; border:none;">
-                    <input type="checkbox" id="svc_${svc.id}" ${svc.def ? 'checked' : ''} onchange="App.calculate()">
-                    <label>${svc.name}</label>
-                </div>
-                <input type="number" id="port_${svc.id}" value="${svc.port}" style="width:70px; padding:4px; height:auto; font-size:0.8rem;">
-            </div>`;
-        });
+        if (svcContainer) {
+            ipServicesList.forEach(svc => {
+                svcContainer.innerHTML += `
+                <div style="display:flex; align-items:center; justify-content:space-between; background:rgba(255,255,255,0.03); padding:5px 10px; border-radius:4px;">
+                    <div class="checkbox-item" style="margin:0; padding:0; background:none; border:none;">
+                        <input type="checkbox" id="svc_${svc.id}" ${svc.def ? 'checked' : ''} onchange="App.calculate()">
+                        <label>${svc.name}</label>
+                    </div>
+                    <input type="number" id="port_${svc.id}" value="${svc.port}" style="width:70px; padding:4px; height:auto; font-size:0.8rem;">
+                </div>`;
+            });
+        }
 
-        getEl('cfg_simult').value = appConfig.simultaneity;
-        getEl('cfg_cpu_pps').value = appConfig.cpu_pps_factor;
+        if (getEl('cfg_simult')) getEl('cfg_simult').value = appConfig.simultaneity;
+        if (getEl('cfg_cpu_pps')) getEl('cfg_cpu_pps').value = appConfig.cpu_pps_factor;
 
-        handleScenarioChange(); // This sets defaults
+        handleScenarioChange();
         calculate();
+    }
+
+    function togglePass(id, btn) {
+        const input = getEl(id);
+        if (input) {
+            if (input.type === "password") {
+                input.type = "text";
+                btn.innerText = "🔒";
+            } else {
+                input.type = "password";
+                btn.innerText = "👁️";
+            }
+        }
     }
 
     function handleScenarioChange() {
         const sc = getVal('scenario');
         const container = getEl('dynamicOptions');
+        if (!container) return; // safety
+
         let html = '';
         
-        // Auto-sets based on requirements
         if (sc === 'hotspot') {
-            getEl('users').value = 500;
-            getEl('bandwidth').value = 1000;
-            getEl('usagePreset').value = 'wifi';
-            App.applyPreset(false); // Update internals but don't recalc yet
+            if(getEl('users')) getEl('users').value = 500;
+            if(getEl('bandwidth')) getEl('bandwidth').value = 1000;
+            if(getEl('usagePreset')) getEl('usagePreset').value = 'wifi';
+            App.applyPreset(false);
 
             html += `
             <div style="padding:15px; background:rgba(255,255,255,0.05); border-radius:8px;">
@@ -833,14 +937,8 @@ const App = (function() {
                 <div id="hsSpeedFields">
                     <label>Controle de Banda por Dispositivo (Mbps)</label>
                     <div class="form-grid">
-                        <div class="input-icon-wrapper">
-                            <i>⬇️</i>
-                            <input type="number" id="hsDl" value="5" placeholder="Down" oninput="App.calculate()">
-                        </div>
-                        <div class="input-icon-wrapper">
-                            <i>⬆️</i>
-                            <input type="number" id="hsUl" value="1" placeholder="Up" oninput="App.calculate()">
-                        </div>
+                        <div class="input-icon-wrapper"><i>⬇️</i><input type="number" id="hsDl" value="10" placeholder="Down" oninput="App.calculate()"></div>
+                        <div class="input-icon-wrapper"><i>⬆️</i><input type="number" id="hsUl" value="3" placeholder="Up" oninput="App.calculate()"></div>
                     </div>
                 </div>
                 
@@ -875,9 +973,9 @@ const App = (function() {
                 <div id="dhcp_info_txt" style="font-size:0.75rem; color:var(--success);">~2046 IPs Disponíveis</div>
             </div>`;
         } else if (sc === 'corporate') {
-            getEl('users').value = 250;
-            getEl('bandwidth').value = 1000;
-            getEl('usagePreset').value = 'heavy';
+            if(getEl('users')) getEl('users').value = 250;
+            if(getEl('bandwidth')) getEl('bandwidth').value = 1000;
+            if(getEl('usagePreset')) getEl('usagePreset').value = 'heavy';
             App.applyPreset(false);
 
             html += `
@@ -890,28 +988,22 @@ const App = (function() {
             <div style="margin-top:15px;">
                  <div class="checkbox-item"><input type="checkbox" id="corp_queues" onchange="App.calculate()"><label>Ativar Controle de Banda (Mbps)</label></div>
                  <div id="corpSpeed" class="hidden form-grid" style="margin-top:10px;">
-                    <div class="input-icon-wrapper">
-                        <i>⬇️</i>
-                        <input type="number" id="corpDl" value="10" oninput="App.calculate()">
-                    </div>
-                    <div class="input-icon-wrapper">
-                        <i>⬆️</i>
-                        <input type="number" id="corpUl" value="5" oninput="App.calculate()">
-                    </div>
+                    <div class="input-icon-wrapper"><i>⬇️</i><input type="number" id="corpDl" value="10" oninput="App.calculate()"></div>
+                    <div class="input-icon-wrapper"><i>⬆️</i><input type="number" id="corpUl" value="5" oninput="App.calculate()"></div>
                  </div>
             </div>`;
         } else {
-            // Domestic
-            getEl('users').value = 50;
-            getEl('bandwidth').value = 1000;
-            getEl('usagePreset').value = 'standard';
+            if(getEl('users')) getEl('users').value = 50;
+            if(getEl('bandwidth')) getEl('bandwidth').value = 1000;
+            if(getEl('usagePreset')) getEl('usagePreset').value = 'standard';
             App.applyPreset(false);
         }
 
         container.innerHTML = html;
         if(getEl('corp_queues')) {
             getEl('corp_queues').addEventListener('change', function() {
-                getEl('corpSpeed').classList.toggle('hidden', !this.checked);
+                const spd = getEl('corpSpeed');
+                if (spd) spd.classList.toggle('hidden', !this.checked);
                 App.calculate();
             });
         }
@@ -926,66 +1018,122 @@ const App = (function() {
     
     function toggleWanFields() {
         const type = getVal('wanType');
-        getEl('pppoeFields').classList.toggle('hidden', type !== 'pppoe');
-        getEl('staticFields').classList.toggle('hidden', type !== 'static');
+        const ppp = getEl('pppoeFields');
+        const sta = getEl('staticFields');
+        if (ppp) ppp.classList.toggle('hidden', type !== 'pppoe');
+        if (sta) sta.classList.toggle('hidden', type !== 'static');
         calculate();
     }
 
     function toggleToolField(id, force) {
         let el = getEl(id);
-        if (force === undefined) {
-             el.classList.toggle('hidden');
-        } else { el.classList.toggle('hidden', !force); }
+        if (!el) return;
+        if (force === undefined) { el.classList.toggle('hidden'); } 
+        else { el.classList.toggle('hidden', !force); }
     }
     
-    function toggleBkp() { getEl('bkpFields').classList.toggle('hidden', !isChecked('bkp_email')); }
+    function toggleBkp() { 
+        const el = getEl('bkpFields');
+        if (el) el.classList.toggle('hidden', !isChecked('bkp_email')); 
+    }
 
     function updateDhcpInfo() {
         const size = getInt('hs_net_size');
         const count = Math.pow(2, (32 - size)) - 2;
-        getEl('dhcp_info_txt').innerText = `~${count} IPs Disponíveis`;
+        setText('dhcp_info_txt', `~${count} IPs Disponíveis`);
+    }
+
+    // New: Calculate pool from IP and CIDR
+    function updateLanPool() {
+        const ip = getVal('lanIp');
+        const cidr = getInt('lanMask');
+        
+        if (!ip || !cidr) return;
+        
+        const parts = ip.split('.');
+        if (parts.length !== 4) return;
+        
+        // Convert to long
+        const ipLong = (parseInt(parts[0]) << 24) | (parseInt(parts[1]) << 16) | (parseInt(parts[2]) << 8) | parseInt(parts[3]);
+        const maskLong = -1 << (32 - cidr);
+        
+        const networkLong = ipLong & maskLong;
+        const broadcastLong = networkLong | (~maskLong);
+        
+        const startLong = networkLong + 2; 
+        const endLong = broadcastLong - 1;
+
+        if (startLong < endLong) {
+            const startIp = long2ip(networkLong + 10); // Start at .10 convention
+            const endIp = long2ip(endLong);
+            const poolEl = getEl('lanPool');
+            if (poolEl) poolEl.value = `${startIp}-${endIp}`;
+        }
+        App.calculate();
+    }
+
+    function long2ip(ip) {
+        return ((ip >>> 24) + '.' + (ip >> 16 & 255) + '.' + (ip >> 8 & 255) + '.' + (ip & 255));
     }
 
     function calculate() {
         const modelKey = getVal('model');
         const model = hardwareDB[modelKey];
+        if (!model) return;
+
         const scenario = getVal('scenario');
         const users = getInt('users');
         const bw = getInt('bandwidth');
         
-        let effectiveBw = 0, ppsScore = 0, ruleScore = 0, ramUsage = 15;
+        let effectiveBw = 0, ppsScore = 0, ruleScore = 0, ramUsage = 15; // Base RAM 15MB
         let userPlan = 0;
         let ppsFactor = appConfig.cpu_pps_factor;
+        let isFastTrackPossible = true;
 
         // 1. Bandwidth/PPS Base Logic
         if (scenario === 'hotspot') {
             if (isChecked('hs_no_queue')) {
-                userPlan = 20; ppsFactor *= 0.4;
+                userPlan = 20; 
+                ppsFactor *= 0.4; // Less CPU
             } else {
-                userPlan = (getInt('hsDl')||5) + (getInt('hsUl')||1);
+                userPlan = (getInt('hsDl')||10) + (getInt('hsUl')||3);
                 ppsFactor *= 1.2;
+                isFastTrackPossible = false; // Queues disable fasttrack
             }
             
             // WiFeed DHCP Weight logic
             const leaseMins = getInt('hs_lease_time');
             const netSize = getInt('hs_net_size');
-            
-            // CPU: Shorter lease = more renewal packets. 60min is baseline (1.0).
-            // 10min = 6x load factor approx.
-            let leaseFactor = (60 / leaseMins); 
-            // Only affects management CPU portion, approx 0.05 score per user per factor
-            ruleScore += (users * 0.05 * leaseFactor);
-
-            // RAM: Larger subnet = slightly more memory for structures, but active leases dominate
-            // Base overhead for subnet size
-            ramUsage += (Math.pow(2, (32-netSize)) / 1024) * 0.5; // Approx 0.5MB per 1024 IPs potential structure
+            if (leaseMins > 0) {
+                const leaseFactor = (60 / leaseMins); 
+                ruleScore += (users * 0.05 * leaseFactor);
+            }
+            if (netSize > 0) {
+                ramUsage += (Math.pow(2, (32-netSize)) / 1024) * 0.5;
+            }
 
         } else if (scenario === 'corporate') {
             if (isChecked('corp_queues')) {
                 userPlan = (getInt('corpDl')||10) + (getInt('corpUl')||5);
                 ppsFactor *= 1.5;
-            } else { userPlan = 3; }
-        } else { userPlan = 5; }
+                isFastTrackPossible = false;
+            } else { 
+                userPlan = 3; 
+            }
+        } else { // Domestic
+            userPlan = 5; 
+        }
+
+        // LAN DHCP Weight Logic
+        const lanLease = getInt('lanLeaseTime');
+        const lanCidr = getInt('lanMask');
+        if (lanLease > 0) ruleScore += (0.5 * (60/lanLease)); 
+        if (lanCidr > 0) ramUsage += (Math.pow(2, (32-lanCidr)) / 1024) * 0.2;
+
+        // FastTrack Logic
+        if (isFastTrackPossible) {
+            ppsFactor *= 0.4; // FastTrack saves ~60% CPU on forwarding
+        }
 
         let potentialTraf = users * userPlan * appConfig.simultaneity;
         effectiveBw = Math.min(bw, potentialTraf);
@@ -1011,7 +1159,7 @@ const App = (function() {
             if (isChecked('svc_' + s.id)) ramUsage += 0.2;
         });
 
-        // 3. RAM Logic
+        // 3. RAM Logic User Overhead
         if (scenario === 'hotspot') ramUsage += (users * 0.45);
         else ramUsage += (users * 0.15);
 
@@ -1021,7 +1169,7 @@ const App = (function() {
 
         // 4. Update UI
         updateAllBars(cpuPct, ramPct, ramUsage, model.ram, totalCpu, model.cpu_score);
-        getEl('hw-specs').innerText = `${model.arch} | CPU: ${model.cpu_score} | RAM: ${model.ram}MB | ${model.ports}`;
+        setText('hw-specs', `${model.arch} | CPU: ${model.cpu_score} | RAM: ${model.ram}MB | ${model.ports}`);
 
         // 5. Upgrade Check
         checkUpgrade(totalCpu, ramUsage, modelKey);
@@ -1031,11 +1179,10 @@ const App = (function() {
         const cpuP = (reqCpu / hardwareDB[currentKey].cpu_score) * 100;
         const ramP = (reqRam / hardwareDB[currentKey].ram) * 100;
         
-        const alertBox = getEl('upgrade-alert');
-        const mobAlertBox = getEl('mob-upgrade-alert');
+        const popup = getEl('upgrade-popup');
+        const mobPopup = getEl('mob-upgrade-popup');
         
         if (cpuP > 100 || ramP > 100) {
-            // Find next model
             let suggestion = null;
             for (let key of sortedHardwareKeys) {
                 let hw = hardwareDB[key];
@@ -1047,70 +1194,101 @@ const App = (function() {
             
             if (suggestion) {
                 currentSuggestedModel = suggestion;
-                getEl('upgrade-msg').innerText = `Sugestão: ${hardwareDB[suggestion].name}`;
-                alertBox.classList.remove('hidden');
-                mobAlertBox.classList.remove('hidden');
+                const txt = hardwareDB[suggestion].name;
+                setText('upgrade-msg-txt', txt);
+                setText('mob-upgrade-msg-txt', txt);
+                if(popup) popup.classList.remove('hidden');
+                if(mobPopup) mobPopup.style.display = 'flex';
             } else {
                 currentSuggestedModel = null;
-                getEl('upgrade-msg').innerText = "Carga excede o Hardware TOP";
-                alertBox.classList.remove('hidden');
-                mobAlertBox.classList.remove('hidden');
+                const txt = "Hardware TOP";
+                setText('upgrade-msg-txt', txt);
+                setText('mob-upgrade-msg-txt', txt);
+                if(popup) popup.classList.remove('hidden');
+                if(mobPopup) mobPopup.style.display = 'flex';
             }
         } else {
-            alertBox.classList.add('hidden');
-            mobAlertBox.classList.add('hidden');
+            if(popup) popup.classList.add('hidden');
+            if(mobPopup) mobPopup.style.display = 'none';
             currentSuggestedModel = null;
         }
     }
 
     function upgradeModel() {
         if (currentSuggestedModel) {
-            getEl('model').value = currentSuggestedModel;
-            calculate();
+            const el = getEl('model');
+            if(el) {
+                el.value = currentSuggestedModel;
+                calculate();
+            }
         } else {
             alert("Nenhum modelo superior encontrado na base de dados para esta carga.");
         }
     }
 
     function updateAllBars(cpu, ram, ramVal, ramMax, cpuVal, cpuMax) {
-        // Formats
+        // Desktop Text
+        setText('lbl-cpu', `${Math.round(cpu)}%`);
+        setText('det-cpu', `${Math.round(cpuVal)} / ${cpuMax} pts`);
+        updateBar('bar-cpu', '', cpu, 100);
+
+        // New RAM Text Format
+        const ramFree = Math.max(0, ramMax - ramVal);
+        setText('lbl-ram', `${Math.round(ramVal)}MB ${Math.round(ram)}%`);
+        setText('det-ram', `${Math.round(ramFree)}MB Livres`);
+        updateBar('bar-ram', '', ramVal, ramMax);
+
+        // Mobile / Modal Texts
         const cpuTxtMain = `${Math.round(cpu)}%`;
         const cpuTxtSub = `${Math.round(cpuVal)} / ${cpuMax} pts`;
+        const ramTxtMain = `${Math.round(ramVal)}MB ${Math.round(ram)}%`;
+        const ramTxtSub = `${Math.round(ramFree)}MB Livres`;
+
+        // Mobile
+        updateBar('mob-bar-cpu', '', cpu, 100);
+        setText('mob-lbl-cpu-main', cpuTxtMain);
+        setText('mob-lbl-cpu-sub', cpuTxtSub);
         
-        const ramTxtMain = `${Math.round(ram)}%`;
-        const ramFree = Math.max(0, ramMax - ramVal);
-        const ramTxtSub = `${Math.round(ramVal)} Used / ${Math.round(ramFree)} Free MB`;
+        updateBar('mob-bar-ram', '', ramVal, ramMax);
+        setText('mob-lbl-ram-main', ramTxtMain);
+        setText('mob-lbl-ram-sub', ramTxtSub);
 
-        // Desktop
-        updateBar('bar-cpu', 'lbl-cpu', cpu, 100);
-        updateBar('bar-ram', 'lbl-ram', ramVal, ramMax, ` MB (${Math.round(ram)}%)`);
-        getEl('det-cpu').innerText = cpuTxtSub;
-
-        // Mobile Footer (Updated Logic)
-        updateBar('mob-bar-cpu', 'mob-lbl-cpu-main', cpu, 100, cpuTxtMain);
-        getEl('mob-lbl-cpu-sub').innerText = cpuTxtSub;
+        // Adv Modal
+        updateBar('adv-bar-cpu', '', cpu, 100);
+        setText('adv-lbl-cpu-main', cpuTxtMain);
+        setText('adv-lbl-cpu-sub', cpuTxtSub);
         
-        updateBar('mob-bar-ram', 'mob-lbl-ram-main', ram, 100, ramTxtMain);
-        getEl('mob-lbl-ram-sub').innerText = ramTxtSub;
+        updateBar('adv-bar-ram', '', ramVal, ramMax);
+        setText('adv-lbl-ram-main', ramTxtMain);
+        setText('adv-lbl-ram-sub', ramTxtSub);
 
-        // Advanced Modal Status (Clone of Mobile)
-        updateBar('adv-bar-cpu', 'adv-lbl-cpu-main', cpu, 100, cpuTxtMain);
-        getEl('adv-lbl-cpu-sub').innerText = cpuTxtSub;
-        
-        updateBar('adv-bar-ram', 'adv-lbl-ram-main', ram, 100, ramTxtMain);
-        getEl('adv-lbl-ram-sub').innerText = ramTxtSub;
-
-        // Verdict
+        // Verdict Logic - Decoupled Updates for Stability
         const v = getEl('verdict-box');
         const vIcon = getEl('mob-verdict-icon');
         const vTool = getEl('mob-verdict-tooltip');
         
+        // Define State
+        let stateClass = 'ok';
+        let stateIcon = '✅';
+        let stateText = 'ADEQUADO';
+        let stateTool = 'Adequado';
+
         if (ram > 95 || cpu > 95) { 
-            v.innerText = "❌ EXTRAPOLADO"; v.className = "verdict bad"; vIcon.innerText = "❌"; vTool.innerText = "Extrapolado";
+            stateClass = 'bad'; stateIcon = '❌'; stateText = 'EXTRAPOLADO'; stateTool = 'Extrapolado';
         } else if (ram > 80 || cpu > 80) { 
-            v.innerText = "⚠️ ALERTA"; v.className = "verdict warn"; vIcon.innerText = "⚠️"; vTool.innerText = "Alerta";
-        } else { 
-            v.innerText = "✅ ADEQUADO"; v.className = "verdict ok"; vIcon.innerText = "✅"; vTool.innerText = "Adequado";
+            stateClass = 'warn'; stateIcon = '⚠️'; stateText = 'ALERTA'; stateTool = 'Alerta';
+        }
+
+        // Apply individually
+        if (v) {
+            v.innerText = `${stateIcon} ${stateText}`;
+            v.className = `verdict ${stateClass}`;
+        }
+        if (vIcon) {
+            vIcon.innerText = stateIcon;
+        }
+        if (vTool) {
+            vTool.innerText = stateTool;
         }
     }
 
@@ -1120,9 +1298,14 @@ const App = (function() {
         const identity = getVal('identityName');
         const wan = getVal('wanType');
         const lanIp = getVal('lanIp');
+        const lanCidr = getVal('lanMask');
         const lanPool = getVal('lanPool');
+        const lanLease = getVal('lanLeaseTime');
         
-        let s = `# Script Gerado pelo MikroTik Architect v5.5\n`;
+        // Convert Lease to Script Format
+        const leaseStr = (lanLease >= 60) ? `${Math.floor(lanLease/60)}h` : `${lanLease}m`;
+
+        let s = `# Script Gerado pelo MikroTik Architect v5.7\n`;
         s += `/system identity set name="${identity}"\n\n`;
 
         s += `# --- SERVIÇOS IP ---\n`;
@@ -1187,10 +1370,14 @@ const App = (function() {
              s += `/ip address add address=${ip} interface=ether1\n/ip route add gateway=${gw}\n/interface list member add interface=ether1 list=WAN\n`;
         }
         s += `/interface list member add interface=bridge-LAN list=LAN\n`;
-        s += `/ip address add address=${lanIp} interface=bridge-LAN\n`;
+        s += `/ip address add address=${lanIp}/${lanCidr} interface=bridge-LAN\n`;
         s += `/ip pool add name=dhcp_pool ranges=${lanPool}\n`;
-        s += `/ip dhcp-server add name=dhcp1 interface=bridge-LAN address-pool=dhcp_pool disabled=no\n`;
-        s += `/ip dhcp-server network add address=${lanIp.replace(/\/([0-9]+)$/, (m, p) => '.' + (p >= 24 ? '0' : '0') + m)} gateway=${lanIp.split('/')[0]} dns-server=8.8.8.8,1.1.1.1\n`;
+        s += `/ip dhcp-server add name=dhcp1 interface=bridge-LAN address-pool=dhcp_pool disabled=no lease-time=${leaseStr}\n`;
+        
+        // Network calc for script
+        // Simplified network calc using last octet .0
+        const netBase = lanIp.substring(0, lanIp.lastIndexOf('.'));
+        s += `/ip dhcp-server network add address=${netBase}.0/${lanCidr} gateway=${lanIp} dns-server=8.8.8.8,1.1.1.1\n`;
         s += `/ip firewall nat add action=masquerade chain=srcnat out-interface-list=WAN\n`;
 
         if(natRules.length > 0) {
@@ -1204,7 +1391,7 @@ const App = (function() {
             if (isChecked('corp_queues')) {
                 let dl = getVal('corpDl');
                 let ul = getVal('corpUl');
-                s += `/queue simple add name="Limit_Users" target=${lanIp.replace(/\/([0-9]+)$/, (m, p) => '.' + (p >= 24 ? '0' : '0') + m)} max-limit=${ul}M/${dl}M\n`;
+                s += `/queue simple add name="Limit_Users" target=${netBase}.0/${lanCidr} max-limit=${ul}M/${dl}M\n`;
             }
         }
 
@@ -1213,33 +1400,6 @@ const App = (function() {
     }
 
     // --- Auxiliary Functions ---
-    function autoCalcPool(val) {
-        // Updated to support /8 to /30
-        if (!val.includes('/')) return;
-        const [ip, cidrStr] = val.split('/');
-        const cidr = parseInt(cidrStr);
-        if (isNaN(cidr) || cidr < 8 || cidr > 30) return;
-
-        // Very basic "Next IP to End" calc logic for display purposes
-        // Real IP math is complex, we stick to common convention: .10 to .Last-1
-        // This is a simplification string replacement for common use cases
-        
-        const parts = ip.split('.');
-        if (parts.length !== 4) return;
-        
-        // Se for /24 normal
-        if (cidr === 24) {
-             const base = parts.slice(0, 3).join('.');
-             getEl('lanPool').value = `${base}.10-${base}.254`;
-        } 
-        // Se for menor que /24, a lógica de script simples não suporta perfeitamente sem biblioteca IP
-        // Vamos manter o input editável e sugerir algo básico
-        else {
-             // Deixa o usuário definir ou mantém o que estava se não for padrão /24
-             // Para /30, geralmente só tem 2 IPs úteis
-        }
-    }
-
     function addExtraUser() { 
         const name = prompt("Nome do Usuário:"); 
         const pass = prompt("Senha:"); 
@@ -1251,17 +1411,22 @@ const App = (function() {
     
     function renderExtras() {
         const div = getEl('usersList');
-        div.innerHTML = `<div style="background:rgba(255,255,255,0.05); padding:10px; border-radius:4px; margin-bottom:5px;">
-                            <input type="text" id="adminName" value="${getVal('adminName')}" style="margin-bottom:5px;">
-                            <input type="text" id="adminPass" value="${getVal('adminPass')}">
-                            <small style="color:var(--success)">Admin Principal</small>
-                        </div>`;
-        extraUsers.forEach((u, idx) => {
-            const el = document.createElement('div');
-            el.style = "background:rgba(0,0,0,0.3); padding:8px; margin-top:5px; border-radius:4px; display:flex; justify-content:space-between; align-items:center;";
-            el.innerHTML = `<span>${u.name}</span> <span style="color:var(--danger); cursor:pointer;" onclick="App.removeUser(${idx})">✕</span>`;
-            div.appendChild(el);
-        });
+        if (div) {
+            div.innerHTML = `<div style="background:rgba(255,255,255,0.05); padding:10px; border-radius:4px; margin-bottom:5px;">
+                                <input type="text" id="adminName" value="${getVal('adminName')}" style="margin-bottom:5px;">
+                                <div class="pass-wrapper">
+                                    <input type="password" id="adminPass" value="${getVal('adminPass')}" style="padding-right: 30px;">
+                                    <span class="pass-toggle-btn" onclick="App.togglePass('adminPass', this)">👁️</span>
+                                </div>
+                                <small style="color:var(--success)">Admin Principal</small>
+                            </div>`;
+            extraUsers.forEach((u, idx) => {
+                const el = document.createElement('div');
+                el.style = "background:rgba(0,0,0,0.3); padding:8px; margin-top:5px; border-radius:4px; display:flex; justify-content:space-between; align-items:center;";
+                el.innerHTML = `<span>${u.name}</span> <span style="color:var(--danger); cursor:pointer;" onclick="App.removeUser(${idx})">✕</span>`;
+                div.appendChild(el);
+            });
+        }
     }
 
     function removeUser(idx) { extraUsers.splice(idx, 1); renderExtras(); }
@@ -1270,12 +1435,16 @@ const App = (function() {
         const ip = getVal('natIp'); const port = getVal('natPort');
         const proto = getVal('natProto'); const comment = getVal('natComment');
         if(ip && port) { natRules.push({ip, port, proto, comment}); renderNat(); calculate(); }
-        getEl('natIp').value = ''; getEl('natPort').value = '';
+        const elIp = getEl('natIp'); if(elIp) elIp.value = '';
+        const elPort = getEl('natPort'); if(elPort) elPort.value = '';
     }
 
     function renderNat() {
-        const d = getEl('natList'); d.innerHTML = '';
-        natRules.forEach((r, idx) => d.innerHTML += `<div style="font-size:0.8em; border-bottom:1px solid #333; padding:5px; display:flex; justify-content:space-between;"><span>${r.port}/${r.proto} -> ${r.ip} (${r.comment})</span> <span style="color:red; cursor:pointer;" onclick="App.removeNat(${idx})">[x]</span></div>`);
+        const d = getEl('natList');
+        if (d) {
+            d.innerHTML = '';
+            natRules.forEach((r, idx) => d.innerHTML += `<div style="font-size:0.8em; border-bottom:1px solid #333; padding:5px; display:flex; justify-content:space-between;"><span>${r.port}/${r.proto} -> ${r.ip} (${r.comment})</span> <span style="color:red; cursor:pointer;" onclick="App.removeNat(${idx})">[x]</span></div>`);
+        }
     }
 
     function removeNat(idx) { natRules.splice(idx, 1); renderNat(); calculate(); }
@@ -1290,12 +1459,11 @@ const App = (function() {
         else if(p==='heavy'){appConfig.simultaneity=0.9;appConfig.cpu_pps_factor=0.5; txt="Intenso";}
         else {appConfig.simultaneity=0.6;appConfig.cpu_pps_factor=0.3; txt="Padrão";}
         
-        getEl('cfg_simult').value = appConfig.simultaneity;
-        getEl('cfg_cpu_pps').value = appConfig.cpu_pps_factor;
+        const elSimult = getEl('cfg_simult'); if(elSimult) elSimult.value = appConfig.simultaneity;
+        const elCpu = getEl('cfg_cpu_pps'); if(elCpu) elCpu.value = appConfig.cpu_pps_factor;
         
-        label.innerText = "Perfil: " + txt;
+        if(label) label.innerText = "Perfil: " + txt;
         
-        // Se chamado pelo change do select, recalcula
         if(fromSelect) calculate();
     }
 
@@ -1306,31 +1474,54 @@ const App = (function() {
     }
 
     function copyToClipboard(btn) {
-        const txt = getEl('finalScript'); txt.select(); document.execCommand('copy');
-        const old = btn.innerText; btn.innerText = "Copiado!"; setTimeout(() => btn.innerText = old, 2000);
+        const txt = getEl('finalScript');
+        if(txt) {
+            txt.select();
+            document.execCommand('copy');
+            const old = btn.innerText;
+            btn.innerText = "Copiado!";
+            setTimeout(() => btn.innerText = old, 2000);
+        }
     }
 
     function downloadScript() { 
-        const blob = new Blob([getEl('finalScript').value], {type: "text/plain"});
-        const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "config.rsc"; a.click(); 
+        const el = getEl('finalScript');
+        if(el) {
+            const blob = new Blob([el.value], {type: "text/plain"});
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(blob);
+            a.download = "config.rsc";
+            a.click();
+        }
     }
 
     // Exports
     return {
         init, calculate, handleScenarioChange, toggleWanFields, toggleHsFields,
-        toggleToolField, toggleBkp, generateScript, autoCalcPool,
+        toggleToolField, toggleBkp, generateScript, updateLanPool,
         addExtraUser, removeUser, addNatRule, removeNat,
         applyPreset, updateConfig, copyToClipboard, downloadScript, 
-        updateDhcpInfo, upgradeModel
+        updateDhcpInfo, upgradeModel, togglePass
     };
 
 })();
 
-// Global Helpers for HTML event binding
-window.openModal = (id) => { document.getElementById(id).style.display = 'flex'; setTimeout(() => document.getElementById(id).classList.add('open'), 10); App.calculate(); };
-window.closeModal = (id) => { document.getElementById(id).classList.remove('open'); setTimeout(() => document.getElementById(id).style.display = 'none', 300); };
+window.openModal = (id) => { 
+    const el = document.getElementById(id);
+    if(el) {
+        el.style.display = 'flex'; 
+        setTimeout(() => el.classList.add('open'), 10); 
+        App.calculate(); 
+    }
+};
+window.closeModal = (id) => { 
+    const el = document.getElementById(id);
+    if(el) {
+        el.classList.remove('open'); 
+        setTimeout(() => el.style.display = 'none', 300); 
+    }
+};
 
-// Start
 document.addEventListener('DOMContentLoaded', App.init);
 
 </script>
