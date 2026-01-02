@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>MikroTik Architect v7.1 (Final)</title>
+    <title>MikroTik Architect v7.2 (Final)</title>
     <meta name="description" content="Calculadora de dimensionamento de hardware MikroTik e gerador de script com suporte a WiFeed.">
     <style>
         :root {
@@ -333,10 +333,10 @@
         /* --- Upgrade Popup --- */
         .upgrade-popup-container {
             position: absolute;
-            bottom: 100%;
+            top: 100%; /* Changed from bottom: 100% to push it below */
             left: 0;
             width: 100%;
-            margin-bottom: 15px;
+            margin-top: 10px;
             z-index: 100;
         }
 
@@ -559,7 +559,7 @@
     <!-- Header Area -->
     <header class="header">
         <div class="brand">
-            <h1>MikroTik Architect <span class="version-tag">v7.1</span></h1>
+            <h1>MikroTik Architect <span class="version-tag">v7.2</span></h1>
             <div style="font-size: 0.9rem; color: var(--text-muted);">Planejamento & Scripting (Full Management)</div>
         </div>
         <button class="btn btn-secondary btn-sm" onclick="openModal('advancedModal')">
@@ -677,6 +677,9 @@
 
             <!-- Verdict & Popup Container -->
             <div style="position:relative;">
+                
+                <div id="verdict-box" class="verdict ok">✅ ADEQUADO</div>
+
                 <div id="upgrade-popup" class="upgrade-popup-container hidden" onclick="App.upgradeModel()">
                     <div class="upgrade-popup">
                         <div>
@@ -686,8 +689,6 @@
                         <i class="arrow">➜</i>
                     </div>
                 </div>
-                
-                <div id="verdict-box" class="verdict ok">✅ ADEQUADO</div>
             </div>
         </div>
 
@@ -992,7 +993,7 @@ window.App = (function() {
         config: {
             dhcpGateway: '',
             dhcpPool: '',
-            dhcpLease: '',
+            dhcpLease: '1h',
             storeLeaseTime: '00:05:00',
             interfaceName: '',
             schedulerInterval: '5m',
@@ -1060,13 +1061,43 @@ window.App = (function() {
         });
     }
 
+    function getLeaseOptionsHtml(selectedValue) {
+        const options = [
+            {v:'10m', l:'10 Minutos'},
+            {v:'30m', l:'30 Minutos'},
+            {v:'1h', l:'1 Hora'},
+            {v:'2h', l:'2 Horas'},
+            {v:'3h', l:'3 Horas'},
+            {v:'6h', l:'6 Horas'},
+            {v:'12h', l:'12 Horas'},
+            {v:'24h', l:'24 Horas'}
+        ];
+        return options.map(o => `<option value="${o.v}" ${o.v === selectedValue ? 'selected' : ''}>${o.l}</option>`).join('');
+    }
+
+    function parseLeaseTime(str) {
+        // Tries to convert 10m, 1h, 01:00:00 to minutes
+        if (!str) return 60;
+        let m = 0;
+        if (str.includes(':')) {
+            const p = str.split(':').map(Number);
+            m = (p[0]*60) + p[1];
+        } else if (str.endsWith('h')) {
+            m = parseInt(str)*60;
+        } else if (str.endsWith('m')) {
+            m = parseInt(str);
+        }
+        return m || 60;
+    }
+
     // --- WiFeed Logic ---
     function parseWiFeedScript(content) {
         const result = {
             ipCidr: 24,
             interface: 'Unknown',
             ipRange: 'Unknown',
-            leaseTime: 60, // mins
+            leaseTime: '1h', // default string
+            leaseTimeMins: 60,
             walledGardenCount: 0,
             radiusIp: 'Unknown',
             radiusPort: 'Unknown',
@@ -1090,10 +1121,19 @@ window.App = (function() {
         const ipMatch = content.match(/#\s*ipAddress\s*-\s*(.+)/);
         if (ipMatch) result.gateway = ipMatch[1].trim();
 
-        // Lease Time Parsing (hh:mm:ss)
+        // Lease Time Parsing
         const leaseMatch = content.match(/lease-time="?(\d+):(\d+):(\d+)"?/);
         if (leaseMatch) {
-            result.leaseTime = (parseInt(leaseMatch[1]) * 60) + parseInt(leaseMatch[2]);
+            const h = parseInt(leaseMatch[1]);
+            const m = parseInt(leaseMatch[2]);
+            const totalMins = (h * 60) + m;
+            result.leaseTimeMins = totalMins;
+            
+            // Map to string format 1h, 30m etc roughly or exact
+            if (totalMins === 60) result.leaseTime = '1h';
+            else if (totalMins === 30) result.leaseTime = '30m';
+            else if (totalMins % 60 === 0) result.leaseTime = (totalMins/60) + 'h';
+            else result.leaseTime = totalMins + 'm';
         }
 
         // Radius
@@ -1115,13 +1155,12 @@ window.App = (function() {
         const schedMatch = content.match(/interval=(\d+[smhd]+)/);
         if(schedMatch) result.schedulerInterval = schedMatch[1];
 
-        // Extract Walled Garden Lines
-        const wgRegex = /\/ip hotspot walled-garden ip add action=accept.*comment="?.*"?/g;
-        const matches = content.match(wgRegex);
-        if(matches) {
-            result.walledGardenLines = matches;
-            result.walledGardenCount = matches.length;
-        }
+        // Extract Walled Garden Lines - More robust regex
+        // Looks for lines starting with "/ip hotspot walled-garden ip add"
+        // Need to handle potential line breaks in RSC
+        const lines = content.split('\n');
+        result.walledGardenLines = lines.filter(l => l.trim().startsWith('/ip hotspot walled-garden ip add') || l.trim().startsWith('add action=accept') && l.includes('walled-garden'));
+        result.walledGardenCount = result.walledGardenLines.length;
 
         return result;
     }
@@ -1143,7 +1182,7 @@ window.App = (function() {
                 // Initialize Config state from parsed data
                 wifeedState.config.dhcpGateway = p.gateway;
                 wifeedState.config.dhcpPool = p.ipRange;
-                wifeedState.config.dhcpLease = `${Math.floor(p.leaseTime/60)}h${p.leaseTime%60}m`;
+                wifeedState.config.dhcpLease = p.leaseTime;
                 wifeedState.config.storeLeaseTime = p.storeLeases;
                 wifeedState.config.interfaceName = p.interface;
                 wifeedState.config.schedulerInterval = p.schedulerInterval;
@@ -1152,15 +1191,20 @@ window.App = (function() {
 
                 // Set Logic for Fix Auth
                 if (p.requireMsgAuth) {
-                    wifeedState.toggles.fixAuth = false; // Already exists, logic handled in render
+                    wifeedState.toggles.fixAuth = false; // Already exists
                 } else {
-                    wifeedState.toggles.fixAuth = false; // Disabled by default even if needed
+                    wifeedState.toggles.fixAuth = false; // Disabled by default
                 }
                 
                 wifeedState.toggles.includeScript = true;
 
                 renderWiFeedEditor();
                 handleScenarioChange(); // Refresh dashboard fields
+                
+                // Ensure dashboard is visible
+                const dash = getEl('wifeed-dashboard');
+                if (dash) dash.classList.remove('hidden');
+
                 calculate();
                 
                 getEl('wifFeedScriptUpload').value = ''; 
@@ -1175,6 +1219,9 @@ window.App = (function() {
         wifeedState.content = '';
         wifeedState.parsed = { walledGardenLines: [] };
         
+        const dash = getEl('wifeed-dashboard');
+        if (dash) dash.classList.add('hidden');
+
         handleScenarioChange(); // Hide custom inputs
         renderWiFeedEditor();
         calculate();
@@ -1193,8 +1240,7 @@ window.App = (function() {
 
     function updateWiFeedConfig(key, value) {
         wifeedState.config[key] = value;
-        // Don't necessarily re-render editor, just calc
-        calculate(); 
+        calculate(); // Recalc stats, re-render implies renderWiFeedEditor call which might lose focus
     }
 
     function toggleWGRule(idx) {
@@ -1212,7 +1258,7 @@ window.App = (function() {
         } else {
             wifeedState.config.walledGardenChecked = wifeedState.parsed.walledGardenLines.map((_, i) => i);
         }
-        renderWiFeedEditor();
+        renderWiFeedEditor(); // Need to re-render checkboxes
         calculate();
     }
 
@@ -1229,6 +1275,10 @@ window.App = (function() {
             getEl('wifFeedScriptUpload').addEventListener('change', handleFileUpload);
             return;
         }
+
+        // Check previous state of body to persist accordion
+        const prevBody = getEl('wifeedEditorBody');
+        const wasOpen = prevBody ? prevBody.classList.contains('open') : false;
 
         const p = wifeedState.parsed;
         const t = wifeedState.toggles;
@@ -1256,10 +1306,8 @@ window.App = (function() {
             if(t.scheduler) cpuDelta += 1;
             if(t.fixAuth) cpuDelta += 0.5;
             if(t.dhcp) ramDelta += 2;
-            // Store lease disk impact
             const [h,m] = c.storeLeaseTime.split(':').map(Number);
-            if(t.storage && m < 15) cpuDelta += (15-m)*0.2; // Penalty for frequent writing
-            
+            if(t.storage && m < 15) cpuDelta += (15-m)*0.2; 
             ramDelta += 5; 
         }
 
@@ -1286,7 +1334,7 @@ window.App = (function() {
                 <span>Editar Script WiFeed (Opções & Config)</span>
                 <span class="arrow-icon">▼</span>
             </div>
-            <div id="wifeedEditorBody" class="wifeed-editor-body">
+            <div id="wifeedEditorBody" class="wifeed-editor-body ${wasOpen ? 'open' : ''}">
                 
                 <!-- Auth Fix -->
                 <div class="editor-row">
@@ -1314,7 +1362,12 @@ window.App = (function() {
                         <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;">
                             <div><label style="font-size:0.75rem">Gateway IP</label><input type="text" value="${c.dhcpGateway}" oninput="App.updateWiFeedConfig('dhcpGateway', this.value)"></div>
                             <div><label style="font-size:0.75rem">Pool Range</label><input type="text" value="${c.dhcpPool}" oninput="App.updateWiFeedConfig('dhcpPool', this.value)"></div>
-                            <div><label style="font-size:0.75rem">Lease Time</label><input type="text" value="${c.dhcpLease}" oninput="App.updateWiFeedConfig('dhcpLease', this.value)"></div>
+                            <div>
+                                <label style="font-size:0.75rem">Lease Time</label>
+                                <select onchange="App.updateWiFeedConfig('dhcpLease', this.value)">
+                                    ${getLeaseOptionsHtml(c.dhcpLease)}
+                                </select>
+                            </div>
                         </div>
                     </div>` : ''}
                 </div>
@@ -1389,14 +1442,21 @@ window.App = (function() {
                         <button class="btn btn-secondary btn-sm" onclick="App.toggleAllWG()">Marcar/Desmarcar Todos</button>
                         <div class="wg-list">
                             ${p.walledGardenLines.map((line, idx) => {
-                                // Extract comment for cleaner display
-                                const commentMatch = line.match(/comment="([^"]+)"/);
-                                const comment = commentMatch ? commentMatch[1] : line.substring(0, 50)+'...';
+                                // Clean up line for display
+                                const commentMatch = line.match(/comment="?([^"]+)"?/);
+                                let comment = commentMatch ? commentMatch[1] : line;
+                                // If no comment, try to extract dst-host
+                                if(!commentMatch) {
+                                    const dst = line.match(/dst-host=([^\s]+)/);
+                                    if(dst) comment = dst[1];
+                                }
+                                comment = comment.replace('/ip hotspot walled-garden ip add action=accept', '').trim();
+                                
                                 const isChecked = c.walledGardenChecked.includes(idx);
                                 return `
                                 <div class="wg-item">
                                     <input type="checkbox" ${isChecked ? 'checked' : ''} onchange="App.toggleWGRule(${idx})">
-                                    <span>${comment}</span>
+                                    <span>${comment.substring(0, 60)}</span>
                                 </div>`;
                             }).join('')}
                         </div>
@@ -1518,15 +1578,25 @@ window.App = (function() {
                 </div>
                 
                 <!-- Only show manual net size if no upload or if DHCP option is disabled in editor -->
-                <div class="form-group" style="margin-top:15px;" id="hsManualNet">
-                    <label>Tamanho da Rede (Manual)</label>
-                    <select id="hs_net_size" onchange="App.calculate()">
-                        <option value="24">/24 (254 IPs)</option>
-                        <option value="23">/23 (510 IPs)</option>
-                        <option value="22">/22 (1022 IPs)</option>
-                        <option value="21" selected>/21 (2046 IPs)</option>
-                        <option value="20">/20 (4094 IPs)</option>
-                    </select>
+                <div class="form-grid" style="margin-top:15px;" id="hsManualNet">
+                    <div class="form-group">
+                        <label>Tamanho da Rede (Manual)</label>
+                        <select id="hs_net_size" onchange="App.calculate()">
+                            <option value="24">/24 (254 IPs)</option>
+                            <option value="23">/23 (510 IPs)</option>
+                            <option value="22">/22 (1022 IPs)</option>
+                            <option value="21" selected>/21 (2046 IPs)</option>
+                            <option value="20">/20 (4094 IPs)</option>
+                            <option value="19">/19 (8190 IPs)</option>
+                            <option value="18">/18 (16382 IPs)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Lease Time (WiFeed)</label>
+                        <select id="hs_lease_time_manual" onchange="App.calculate()">
+                            ${getLeaseOptionsHtml('1h')}
+                        </select>
+                    </div>
                 </div>
             </div>`;
         } else if (sc === 'corporate') {
@@ -1577,17 +1647,26 @@ window.App = (function() {
                 
                 // Hide/Show manual net inputs
                 const manNet = getEl('hsManualNet');
-                if(manNet) manNet.style.display = t.dhcp ? 'none' : 'block';
+                if(manNet) manNet.style.display = t.dhcp ? 'none' : 'grid';
 
                 if(t.walledGarden) { ramUsage += (c.walledGardenChecked.length * 0.1); ruleScore += 2; }
                 if(t.scheduler) ruleScore += 1;
                 if(t.fixAuth) ruleScore += 0.5;
-                if(t.dhcp) ramUsage += 2;
+                if(t.dhcp) {
+                    ramUsage += 2;
+                    // Calc lease time impact from editor config
+                    const leaseMins = parseLeaseTime(c.dhcpLease);
+                    if(leaseMins < 60) ruleScore += (users * 0.05 * (60/leaseMins));
+                }
                 ramUsage += 5; 
             } else {
                 // Manual fallback
                 const netSize = getInt('hs_net_size') || 21;
                 ramUsage += (Math.pow(2, (32-netSize)) / 1024) * 0.5;
+                
+                const leaseManual = getVal('hs_lease_time_manual');
+                const leaseMins = parseLeaseTime(leaseManual);
+                if(leaseMins < 60) ruleScore += (users * 0.05 * (60/leaseMins));
             }
 
         } else if (scenario === 'corporate') {
@@ -1633,7 +1712,7 @@ window.App = (function() {
         const lanLease = getVal('lanLeaseTime');
         const leaseStr = (lanLease >= 60) ? `${Math.floor(lanLease/60)}h` : `${lanLease}m`;
 
-        let s = `# Script Gerado pelo MikroTik Architect v7.1\n`;
+        let s = `# Script Gerado pelo MikroTik Architect v7.2\n`;
         s += `/system identity set name="${identity}"\n\n`;
 
         s += `# --- SERVIÇOS IP ---\n`;
@@ -1734,14 +1813,12 @@ window.App = (function() {
                 wf = wf.replace(/#\s*ipRange\s*-\s*.+/, `# ipRange - ${c.dhcpPool}`);
                 // Attempt to replace actual command values if they exist in standard pattern
                 wf = wf.replace(/address-pool="?[\w-]+"?.+/, `address-pool=hotspot-pool-1`); 
-                // NOTE: A real parser would rebuild the command. Here we do simple replacement or append overrides.
                 s += `\n# Overriding DHCP Config based on UI\n`;
                 s += `/ip pool set [find name="hotspot-pool-1"] ranges=${c.dhcpPool}\n`;
-                s += `/ip address set [find comment="hotspot"] address=${c.dhcpGateway}/${p.ipCidr}\n`; // Assuming comment hotspot
-                s += `/ip dhcp-server set [find name="dhcp1"] lease-time=${c.dhcpLease}\n`; // Name might vary
+                s += `/ip address set [find comment="hotspot"] address=${c.dhcpGateway}/${p.ipCidr}\n`; 
+                s += `/ip dhcp-server set [find name="dhcp1"] lease-time=${c.dhcpLease}\n`;
             } else {
                 s += `# DHCP Section Removed by User\n`;
-                // Logic to remove DHCP commands would require complex regex or block parsing
             }
 
             // 3. Store Leases
@@ -1751,7 +1828,7 @@ window.App = (function() {
 
             // 4. Interface
             if (t.interface) {
-                wf = wf.replace(/interface="?[\w-]+"?/g, `interface="${c.interfaceName}"`); // Risky global replace, refined below
+                wf = wf.replace(/interface="?[\w-]+"?/g, `interface="${c.interfaceName}"`); 
                 s += `\n# Interface forced to: ${c.interfaceName}\n`;
             }
 
@@ -1762,19 +1839,11 @@ window.App = (function() {
 
             // 6. Walled Garden Rebuild
             if (t.walledGarden) {
-                // First, remove existing WG lines from wf string to avoid dupes
-                // This is hard with regex alone. A better approach is to append the *active* rules at the end
-                // and assume the script cleans up before adding, or we filter the raw content.
-                // For this V7 demo, we will append the selected rules explicitly.
-                
                 const selectedRules = c.walledGardenChecked.map(i => p.walledGardenLines[i]).join('\n');
                 s += `\n# Walled Garden Rules (Filtered)\n`;
                 s += selectedRules + `\n`;
             }
 
-            // Append the modified raw content (simplification)
-            // Ideally we would reconstruct the script block by block. 
-            // Since we can't fully parse arbitrary RSC, we append the original with specific text replacements made above.
             s += wf; 
         }
 
@@ -1782,6 +1851,7 @@ window.App = (function() {
         openModal('scriptModal');
     }
 
+    // Reuse UI helpers
     function updateDashboard(model, users, bw, userPlan) {
         const dash = getEl('dashboard-grid');
         if (!dash) return;
