@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MikroTik Architect v4.9 Fixed</title>
+    <title>MikroTik Architect v5.0</title>
     <style>
         :root {
             --bg: #13131f; --card-bg: #1e1e2e; --input-bg: #181825;
@@ -13,6 +13,7 @@
         }
         
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(166, 227, 161, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(166, 227, 161, 0); } 100% { box-shadow: 0 0 0 0 rgba(166, 227, 161, 0); } }
         * { box-sizing: border-box; outline: none; -webkit-tap-highlight-color: transparent; }
         
         body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 15px; min-height: 100vh; overflow-x: hidden; }
@@ -46,18 +47,25 @@
         }
         select:focus, input:focus { border-color: var(--accent); }
         
-        /* Input Groups with Icons */
-        .input-group { display: flex; align-items: center; width: 100%; margin-top: 5px; }
-        .input-group-addon { background: rgba(255,255,255,0.05); padding: 10px 12px; border: 1px solid var(--border); border-right: none; border-radius: 6px 0 0 6px; color: #aaa; font-size: 1.1em; display: flex; align-items: center; justify-content: center; min-width: 40px; }
-        .input-group-unit { background: rgba(255,255,255,0.05); padding: 10px; border: 1px solid var(--border); border-left: none; border-radius: 0 6px 6px 0; color: #888; font-size: 0.8em; font-weight: bold; }
-        .input-group input { margin-top: 0; border-radius: 0; border-left: none; border-right: none; flex: 1; }
+        /* Speed Input Group */
+        .speed-row { display: flex; align-items: flex-end; gap: 10px; width: 100%; margin-top: 5px; }
+        .input-group { display: flex; align-items: center; background: var(--input-bg); border: 1px solid var(--border); border-radius: 6px; width: 100%; }
+        .input-group-addon { padding: 0 10px; color: #aaa; font-size: 1.1em; border-right: 1px solid var(--border); background: rgba(255,255,255,0.05); height: 42px; display: flex; align-items: center; border-radius: 6px 0 0 6px; }
+        .input-group input { margin: 0; border: none; background: transparent; height: 40px; border-radius: 0; flex: 1; }
+        .input-group-unit { padding: 0 10px; color: #666; font-size: 0.8em; font-weight: bold; border-left: 1px solid var(--border); height: 42px; display: flex; align-items: center; background: rgba(255,255,255,0.02); border-radius: 0 6px 6px 0; }
+
+        .password-wrapper { position: relative; width: 100%; }
+        .password-wrapper input { padding-right: 40px; }
+        .password-toggle { position: absolute; right: 10px; top: 50%; transform: translateY(-40%); cursor: pointer; opacity: 0.6; font-size: 1.2em; }
         
         .magic-btn {
             background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-            border: none; color: white; border-radius: 6px; width: 42px; height: 38px;
+            border: none; color: white; border-radius: 6px; width: 42px; height: 42px;
             cursor: pointer; display: flex; align-items: center; justify-content: center;
-            font-size: 1.2rem; box-shadow: 0 2px 10px rgba(245, 87, 108, 0.4); margin-left: 5px; margin-top: 5px;
+            font-size: 1.3rem; box-shadow: 0 4px 10px rgba(245, 87, 108, 0.3); 
+            transition: transform 0.2s; flex-shrink: 0;
         }
+        .magic-btn:hover { transform: scale(1.05); }
         .magic-btn:active { transform: scale(0.95); }
 
         .checkbox-wrapper { display: flex; align-items: center; margin-top: 8px; background: rgba(255,255,255,0.03); padding: 10px; border-radius: 6px; cursor: pointer; border: 1px solid transparent; }
@@ -66,6 +74,7 @@
         .checkbox-wrapper label { margin: 0; cursor: pointer; flex: 1; font-size: 0.9em; }
 
         .btn { border: none; padding: 12px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-size: 0.95rem; width: 100%; transition: 0.2s; }
+        .btn:active { transform: scale(0.98); }
         .btn-primary { background: var(--accent); color: #1e1e2e; box-shadow: 0 4px 15px rgba(137, 180, 250, 0.3); }
         .btn-adv { background: #313244; color: white; border: 1px solid var(--border); }
         .btn-ghost { background: transparent; color: var(--accent); border: 1px solid var(--accent); font-size: 0.85rem; padding: 6px 12px; }
@@ -81,16 +90,16 @@
         .info-icon { display: inline-flex; justify-content: center; align-items: center; width: 18px; height: 18px; background: rgba(255,255,255,0.1); color: var(--accent); border-radius: 50%; font-size: 11px; margin-left: 5px; cursor: help; }
         .info-icon:hover::after { content: attr(data-tooltip); position: absolute; background: #111; color: #fff; padding: 10px; border-radius: 6px; font-size: 12px; width: 250px; z-index: 9999; margin-top: 25px; border: 1px solid var(--border); box-shadow: 0 5px 15px black; }
         
-        /* Modais Mobile Friendly */
+        /* Modais */
         .modal-overlay { 
             display: none; position: fixed; top: 0; left: 0; width: 100%; 
-            height: 100%; height: 100dvh; /* Mobile Browser Bar Fix */
+            height: 100%; height: 100dvh; 
             background: rgba(0,0,0,0.85); z-index: 5000; backdrop-filter: blur(4px); 
             justify-content: center; align-items: center; padding: 10px; 
         }
         .modal { 
             background: var(--card-bg); width: 100%; max-width: 1000px; 
-            max-height: 90vh; max-height: 90dvh; /* Mobile Browser Bar Fix */
+            max-height: 90vh; max-height: 90dvh;
             border-radius: 12px; border: 1px solid var(--accent); display: flex; flex-direction: column; 
             box-shadow: 0 25px 50px rgba(0,0,0,0.5); animation: fadeIn 0.2s; 
         }
@@ -109,10 +118,12 @@
         .lease-impact { font-size: 0.75em; margin-top: 4px; display: block; font-style: italic; }
         .impact-good { color: var(--success); } .impact-bad { color: var(--danger); } .impact-neutral { color: #888; }
         .profile-badge { display:inline-block; font-size: 0.8em; padding: 4px 8px; background: rgba(255,255,255,0.1); border-radius: 4px; color: var(--accent); margin-top: 5px; }
-        .rec-btn { background: var(--success); color: #1e1e2e; padding: 10px; border-radius: 6px; text-align: center; margin-top: 10px; cursor: pointer; animation: pulse 2s infinite; font-weight: bold; font-size: 0.9em; display: none; }
-        .password-wrapper { position: relative; width: 100%; }
-        .password-wrapper input { padding-right: 40px; }
-        .password-toggle { position: absolute; right: 10px; top: 50%; transform: translateY(-40%); cursor: pointer; opacity: 0.6; font-size: 1.2em; }
+        
+        .rec-btn {
+            background: var(--success); color: #1e1e2e; padding: 15px; border-radius: 8px; 
+            text-align: center; margin-top: 15px; cursor: pointer; animation: pulse 2s infinite;
+            font-weight: bold; font-size: 0.95em; display: none; border: 1px solid var(--success);
+        }
 
         textarea { width: 100%; height: 400px; background: #0b0b12; color: var(--success); border: none; padding: 15px; font-family: monospace; font-size: 13px; resize: none; border-radius: 6px; }
         .verdict-box { padding: 15px; border-radius: 8px; text-align: center; font-weight: bold; margin-top: 15px; transition: background 0.3s; }
@@ -124,11 +135,13 @@
 <body>
 
 <div class="layout-container">
+    
     <div style="display:flex; flex-direction:column; gap:20px;">
+        
         <div style="display:flex; flex-wrap: wrap; justify-content:space-between; align-items:center; gap: 15px;">
             <div>
-                <h1 style="font-size:1.6rem;">MikroTik Architect <span style="font-size:0.5em; background:var(--accent); color:#1e1e2e; padding:2px 6px; border-radius:4px; vertical-align:middle;">v4.9 Fix</span></h1>
-                <div style="color:#888; font-size:0.9em;">Planejamento & Scripting</div>
+                <h1 style="font-size:1.6rem;">MikroTik Architect <span style="font-size:0.5em; background:var(--accent); color:#1e1e2e; padding:2px 6px; border-radius:4px; vertical-align:middle;">v5.0</span></h1>
+                <div style="color:#888; font-size:0.9em;">Planejamento & Scripting (Definitive Edition)</div>
             </div>
             <button class="btn btn-adv" style="width:auto;" onclick="openModal('advancedModal')">🛠️ Avançado</button>
         </div>
@@ -144,7 +157,7 @@
                 <div>
                     <label>Cenário de Aplicação</label>
                     <select id="scenario" onchange="handleScenarioChange(true); calculate();">
-                        <option value="hotspot">🏢 Hotspot (WiFeed / Captive)</option>
+                        <option value="hotspot" selected>🏢 Hotspot (WiFeed / Captive)</option>
                         <option value="domestic">🏠 Doméstico (DHCP Básico)</option>
                         <option value="corporate">💼 Corporativo (Firewall)</option>
                     </select>
@@ -154,8 +167,8 @@
 
             <div class="input-row" style="margin-top:10px;">
                 <div>
-                    <label>Usuários Simultâneos <span class="info-icon" data-tooltip="Total de dispositivos conectados.">i</span></label>
-                    <input type="number" id="users" value="50" min="1" oninput="calculate()">
+                    <label>Usuários Simultâneos <span class="info-icon" data-tooltip="Dispositivos conectados">i</span></label>
+                    <input type="number" id="users" value="500" min="1" oninput="calculate()">
                 </div>
                 <div>
                     <label>Link WAN Total (Mbps) <span class="info-icon" data-tooltip="Velocidade contratada.">i</span></label>
@@ -208,7 +221,8 @@
             </div>
             
             <div id="verdict" class="verdict-box" style="background:var(--input-bg);">...</div>
-            <div id="recommendationBtn" class="rec-btn" onclick="applyRecommendation()">⬆️ Melhorar Hardware</div>
+            
+            <div id="recommendationBtn" class="rec-btn" onclick="applyRecommendation()"></div>
 
             <div style="margin-top:15px; display:flex; gap:10px;">
                 <button class="btn btn-ghost" style="flex:1" onclick="openModal('debugModal')">🔍 Ajustes & Debug</button>
@@ -257,7 +271,7 @@
                                 <option value="6h">6 horas</option><option value="12h">12 horas</option>
                                 <option value="1d">1 dia</option><option value="3d">3 dias</option>
                             </select>
-                            <button class="magic-btn" onclick="autoTuneLease('lanLease')" title="Calcular">🪄</button>
+                            <button class="magic-btn" style="width:36px; height:36px; font-size:1.1rem; margin-top:0;" onclick="autoTuneLease('lanLease')" title="Calcular">🪄</button>
                         </div>
                         <span id="lanLeaseInfo" class="lease-impact">...</span>
                     </div>
@@ -337,7 +351,6 @@
     let recommendedModel = null;
 
     function init() {
-        // Init Hardware List
         const sel = document.getElementById('model');
         for (const [key, val] of Object.entries(hardwareDB)) {
             let opt = document.createElement('option');
@@ -346,36 +359,31 @@
             sel.add(opt);
         }
         
-        // Init Services
         const svcContainer = document.getElementById('ipServicesContainer');
-        svcContainer.innerHTML = ''; // Clear first to be safe
         ipServicesList.forEach(svc => {
             svcContainer.innerHTML += `<div class="service-row"><div class="checkbox-wrapper" style="margin:0; padding:0; border:none; background:none;"><input type="checkbox" id="svc_${svc.id}" ${svc.def ? 'checked' : ''} onchange="calculate()"><label>${svc.name}</label></div><input type="number" id="port_${svc.id}" value="${svc.port}" placeholder="Porta"></div>`;
         });
 
-        // Debug Setup
         document.getElementById('cfg_simult').value = appConfig.simultaneity;
         document.getElementById('cfg_cpu_pps').value = appConfig.cpu_pps_factor;
-        
-        // Listeners
         document.getElementById('lanIp').addEventListener('input', autoCalcPool);
         
         // Defaults
         document.getElementById('wanType').value = 'pppoe';
         toggleWanFields();
         
-        // Force Initial Logic
-        // IMPORTANT: Passing 'true' to force default values on first load
+        // Inicializa Cenário com Default
         handleScenarioChange(true); 
         
-        // Init LAN Lease Info text
+        // Init LAN Lease Info
         updateLeaseFeedback('lanLease', 'lanLeaseInfo', false, hardwareDB['rb750gr3'].ram);
         
-        calculate(); // Force calculation immediately on load
+        calculate();
     }
 
     function ipToLong(ip){ const p=ip.split('.'); return ((p[0]<<24)>>>0) + ((p[1]<<16)>>>0) + ((p[2]<<8)>>>0) + (p[3]>>>0); }
     function longToIp(num){ return (num>>>24) + '.' + (num>>16 & 255) + '.' + (num>>8 & 255) + '.' + (num & 255); }
+    
     function autoCalcPool(e) {
         const val = e.target.value; const parts = val.split('/');
         if (parts.length === 2) {
@@ -388,6 +396,7 @@
             }
         }
     }
+
     function autoTuneSpeed() {
         const users = parseInt(document.getElementById('users').value)||1; const link = parseInt(document.getElementById('bandwidth').value)||100;
         let dl = Math.round((link * 4) / users); if (dl<2) dl=2; if (dl>link) dl=link; let ul = Math.round(dl*0.5);
@@ -395,22 +404,21 @@
         else if (document.getElementById('corpDl')) { document.getElementById('corpDl').value=dl; document.getElementById('corpUl').value=ul; }
         calculate();
     }
+
     function autoTuneLease(selectId) {
         const model = hardwareDB[document.getElementById('model').value];
         const users = parseInt(document.getElementById('users').value)||50; const select = document.getElementById(selectId);
         let ideal="1h"; if(model.ram<=32) ideal="30m"; else if(model.ram<=64) ideal=(users>100)?"30m":"1h"; else if(model.ram<=256) ideal=(users>500)?"1h":"3h"; else ideal="1d";
         select.value=ideal; calculate();
     }
+
     function getLeaseMinutes(val) { if(val.includes('m')) return parseInt(val); if(val.includes('h')) return parseInt(val)*60; if(val.includes('d')) return parseInt(val)*1440; return 60; }
 
     function updateLeaseFeedback(id, infoId, isHotspot, ramMax) {
         const el = document.getElementById(id);
         const info = document.getElementById(infoId);
         if(!el || !info) return 0;
-        
-        const val = el.value;
-        const mins = getLeaseMinutes(val);
-        
+        const val = el.value; const mins = getLeaseMinutes(val);
         let text = ""; let style = "impact-neutral";
         if (isHotspot) {
             if (mins <= 60) { text = "📉 Alivia RAM"; style = "impact-good"; }
@@ -429,27 +437,22 @@
         const sc = document.getElementById('scenario').value;
         const container = document.getElementById('dynamicOptions');
         const badge = document.getElementById('activeProfile');
-        
         let html = '';
         
-        // This function completely rebuilds the inner HTML based on scenario
         if (sc === 'hotspot') {
-            if(applyDefaults) {
-                document.getElementById('users').value = 500;
-                applyPreset('wifi'); 
-            }
+            if(applyDefaults) { document.getElementById('users').value = 500; applyPreset('wifi'); }
             badge.innerText = "Perfil: Wi-Fi";
             
             html += `
             <div style="padding:15px; background:rgba(255,255,255,0.05); border-radius:8px;">
-                <div class="checkbox-wrapper" style="margin:0 0 10px 0;">
+                <div class="checkbox-wrapper" style="margin:0 0 15px 0;">
                     <input type="checkbox" id="hs_no_queue" onchange="toggleHsFields(); calculate()">
                     <label>Sem controle de banda (Pass-through)</label>
                 </div>
                 
                 <div id="hsSpeedFields">
-                    <label>Plano Médio (Estimativa)</label>
-                    <div class="input-row">
+                    <label>Controle de Banda por Dispositivo</label>
+                    <div class="speed-row">
                         <div class="input-group">
                             <span class="input-group-addon">⬇️</span>
                             <input type="number" id="hsDl" value="10">
@@ -467,33 +470,16 @@
                 <div style="margin-top:15px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.1);">
                     <label>Config DHCP WiFeed (Cálculo)</label>
                     <div style="display:flex; gap:10px;">
-                        <select id="hsSubnet" onchange="calculate()" style="flex:1;">
-                            <option value="24">/24 (254 IPs)</option>
-                            <option value="23">/23 (510 IPs)</option>
-                            <option value="22">/22 (1022 IPs)</option>
-                            <option value="21" selected>/21 (2046 IPs)</option>
-                            <option value="20">/20 (4094 IPs)</option>
-                        </select>
-                        <select id="hsLease" onchange="calculate()" style="flex:1;">
-                            <option value="10m">10 min</option>
-                            <option value="30m">30 min</option>
-                            <option value="1h" selected>1 hora</option>
-                            <option value="3h">3 horas</option>
-                            <option value="6h">6 horas</option>
-                            <option value="12h">12 horas</option>
-                            <option value="1d">1 dia</option>
-                        </select>
-                        <button class="magic-btn" onclick="autoTuneLease('hsLease')">🪄</button>
+                        <select id="hsSubnet" onchange="calculate()" style="flex:1;"><option value="24">/24 (254 IPs)</option><option value="23">/23 (510 IPs)</option><option value="22">/22 (1022 IPs)</option><option value="21" selected>/21 (2046 IPs)</option><option value="20">/20 (4094 IPs)</option></select>
+                        <select id="hsLease" onchange="calculate()" style="flex:1;"><option value="10m">10 min</option><option value="30m">30 min</option><option value="1h" selected>1 hora</option><option value="3h">3 horas</option><option value="6h">6 horas</option><option value="12h">12 horas</option><option value="1d">1 dia</option></select>
+                        <button class="magic-btn" style="margin-top:5px; height:38px; width:42px;" onclick="autoTuneLease('hsLease')">🪄</button>
                     </div>
                     <span id="hsLeaseInfo" class="lease-impact">Padrão WiFeed: /21 e 1h</span>
                 </div>
             </div>`;
         } 
         else if (sc === 'corporate') {
-            if(applyDefaults) {
-                document.getElementById('users').value = 250;
-                applyPreset('heavy');
-            }
+            if(applyDefaults) { document.getElementById('users').value = 250; applyPreset('heavy'); }
             badge.innerText = "Perfil: Intenso";
             
             html += `
@@ -504,9 +490,10 @@
                 <div class="checkbox-wrapper"><input type="checkbox" id="blk_stream" onchange="calculate()"><label>Streaming</label></div>
             </div>
             <div style="margin-top:15px;">
-                 <div class="checkbox-wrapper"><input type="checkbox" id="corp_queues" onchange="calculate()"><label>Controle de Banda</label></div>
-                 <div id="corpSpeed" class="hidden" style="margin-top:10px;">
-                    <div class="input-row">
+                 <div class="checkbox-wrapper" style="margin-bottom:10px;"><input type="checkbox" id="corp_queues" onchange="calculate()"><label>Ativar Controle de Banda</label></div>
+                 <div id="corpSpeed" class="hidden">
+                    <label>Controle de Banda por Dispositivo</label>
+                    <div class="speed-row">
                         <div class="input-group"><span class="input-group-addon">⬇️</span><input type="number" id="corpDl" value="10"><span class="input-group-unit">Mbps</span></div>
                         <div class="input-group"><span class="input-group-addon">⬆️</span><input type="number" id="corpUl" value="5"><span class="input-group-unit">Mbps</span></div>
                         <button class="magic-btn" onclick="autoTuneSpeed()">🪄</button>
@@ -515,22 +502,12 @@
             </div>`;
         } 
         else {
-            if(applyDefaults) {
-                document.getElementById('users').value = 50;
-                applyPreset('standard');
-            }
+            if(applyDefaults) { document.getElementById('users').value = 50; applyPreset('standard'); }
             badge.innerText = "Perfil: Padrão";
         }
         
         container.innerHTML = html;
-        
-        // Re-attach listeners for dynamically created elements
-        if(document.getElementById('corp_queues')) {
-            document.getElementById('corp_queues').addEventListener('change', function() { 
-                document.getElementById('corpSpeed').classList.toggle('hidden', !this.checked); 
-                calculate(); 
-            });
-        }
+        if(document.getElementById('corp_queues')) document.getElementById('corp_queues').addEventListener('change', function() { document.getElementById('corpSpeed').classList.toggle('hidden', !this.checked); calculate(); });
         
         // Initial Hotspot Logic Check
         if (sc === 'hotspot') {
@@ -563,15 +540,12 @@
         } else { el.classList.toggle('hidden', !force); }
         calculate();
     }
-    
     function togglePassVisibility(id, icon) {
         const input = document.getElementById(id);
-        if (input.type === "password") { input.type = "text"; icon.innerText = "🙈"; } 
-        else { input.type = "password"; icon.innerText = "👁️"; }
+        if (input.type === "password") { input.type = "text"; icon.innerText = "🙈"; } else { input.type = "password"; icon.innerText = "👁️"; }
     }
 
     function calculate() {
-        // Safety check if DOM is ready
         const modelEl = document.getElementById('model');
         if(!modelEl || modelEl.value === "") return;
 
@@ -584,13 +558,11 @@
         let effectiveBw = 0, ppsScore = 0, ruleScore = 0, ramUsage = 15;
         let userPlan = 0; let ppsFactor = appConfig.cpu_pps_factor;
 
-        // --- SCENARIO SPECIFIC LOGIC ---
         if (scenario === 'hotspot') {
             const noQueue = document.getElementById('hs_no_queue');
             if (noQueue && noQueue.checked) { 
                 userPlan = 20; ppsFactor *= 0.4; 
             } else { 
-                // Safe element access
                 const dl = document.getElementById('hsDl') ? parseInt(document.getElementById('hsDl').value) : 10;
                 const ul = document.getElementById('hsUl') ? parseInt(document.getElementById('hsUl').value) : 3;
                 userPlan = dl + ul; 
@@ -607,7 +579,7 @@
             } 
             else { userPlan = 3; }
         } 
-        else { userPlan = 5; } // Domestic
+        else { userPlan = 5; }
 
         let potentialTraf = users * userPlan * appConfig.simultaneity;
         effectiveBw = Math.min(bw, potentialTraf);
@@ -615,7 +587,6 @@
         
         if (document.getElementById('wanType').value === 'pppoe') ppsScore *= 1.1;
 
-        // Feature Scoring
         if (scenario === 'corporate') {
             let filters = 0;
             if (document.getElementById('blk_social')?.checked) filters++; 
@@ -641,7 +612,6 @@
         if (scenario === 'hotspot') {
             const hsSubnetEl = document.getElementById('hsSubnet');
             const hsLeaseEl = document.getElementById('hsLease');
-            
             if(hsSubnetEl && hsLeaseEl) {
                 const hsSubnet = hsSubnetEl.value || 24;
                 if (hsSubnet <= 23) ramUsage += Math.pow(2, (24-hsSubnet)) * 0.8;
@@ -649,15 +619,12 @@
                 if(hsMins > 60) ramUsage += (users * (hsMins/60) * 0.1); else ramUsage += (users * 0.45);
                 updateLeaseFeedback('hsLease', 'hsLeaseInfo', true, model.ram);
             }
-        } else { 
-            ramUsage += (users * 0.15); 
-        }
+        } else { ramUsage += (users * 0.15); }
 
         let totalCpu = ppsScore + ruleScore;
         let cpuPct = (totalCpu / model.cpu_score) * 100;
         let ramPct = (ramUsage / model.ram) * 100;
 
-        // Recommendation Logic
         recommendedModel = null;
         if (cpuPct > 100 || ramPct > 100) {
             for (let k of hardwareOrder) {
@@ -674,7 +641,6 @@
         setBar('stat-cpu', cpu, `${Math.round(cpu)}%`);
         setBar('stat-ram', ram, `${Math.round(ramVal)} / ${ramMax} MB`);
         
-        // Safely update detail text if element exists
         const detailEl = document.querySelector('.stat-cpu-detail');
         if(detailEl) detailEl.innerText = `${Math.round(cpuVal)} pts / ${cpuMax} pts`;
 
@@ -682,27 +648,14 @@
         const recBtn = document.getElementById('recommendationBtn');
         
         if (ram > 95 || cpu > 95) { 
-            v.innerText = "❌ EXTRAPOLADO"; 
-            v.style.background = "var(--danger)"; v.style.color = "#1e1e2e"; 
+            v.innerText = "❌ EXTRAPOLADO"; v.style.background = "var(--danger)"; v.style.color = "#1e1e2e"; 
             if(recommendedModel) { 
-                recBtn.style.display = "block"; 
-                recBtn.innerText = `⬆️ Recomendado: ${recommendedModel}`; 
-            } else { 
-                recBtn.style.display = "none"; 
-            } 
+                recBtn.style.display = "block"; recBtn.innerText = `⬆️ Upgrade sugerido: ${recommendedModel}`; 
+            } else { recBtn.style.display = "none"; } 
         }
-        else if (ram > 80 || cpu > 80) { 
-            v.innerText = "⚠️ ALERTA"; 
-            v.style.background = "var(--warning)"; v.style.color = "#1e1e2e"; 
-            recBtn.style.display = "none"; 
-        }
-        else { 
-            v.innerText = "✅ ADEQUADO"; 
-            v.style.background = "var(--success)"; v.style.color = "#1e1e2e"; 
-            recBtn.style.display = "none"; 
-        }
+        else if (ram > 80 || cpu > 80) { v.innerText = "⚠️ ALERTA"; v.style.background = "var(--warning)"; v.style.color = "#1e1e2e"; recBtn.style.display = "none"; }
+        else { v.innerText = "✅ ADEQUADO"; v.style.background = "var(--success)"; v.style.color = "#1e1e2e"; recBtn.style.display = "none"; }
 
-        // Modals
         cloneStatusTo('adv-status-cpu', 'CPU', cpu, `${Math.round(cpuVal)}/${cpuMax} pts`);
         cloneStatusTo('adv-status-ram', 'RAM', ram, `${Math.round(ramVal)}/${ramMax} MB`);
         cloneStatusTo('dbg-status-cpu', 'CPU', cpu, `${Math.round(cpuVal)}/${cpuMax} pts`);
@@ -710,18 +663,14 @@
     }
 
     function cloneStatusTo(id, label, pct, detail) { 
-        const el = document.getElementById(id); 
-        if(!el) return; 
+        const el = document.getElementById(id); if(!el) return; 
         el.innerHTML = `<div class="meter-box" style="margin-top:0; border-color:#555;"><div class="meter-label"><span>${label}</span> <span>${Math.round(pct)}%</span></div><div class="track"><div class="fill ${pct<60?'low':pct<85?'med':'high'}" style="width:${Math.min(pct,100)}%"></div></div><div class="mini-detail">${detail}</div></div>`; 
     }
     
     function setBar(prefix, pct, text) { 
         const bar = document.querySelector(`.${prefix}-bar`); 
         const lbl = document.querySelector(`.${prefix}-text`) || document.querySelector(`.${prefix}-pct`); 
-        if(bar) { 
-            bar.style.width = Math.min(pct, 100) + "%"; 
-            bar.className = `fill ${prefix}-bar ${pct < 60 ? 'low' : pct < 85 ? 'med' : 'high'}`; 
-        } 
+        if(bar) { bar.style.width = Math.min(pct, 100) + "%"; bar.className = `fill ${prefix}-bar ${pct < 60 ? 'low' : pct < 85 ? 'med' : 'high'}`; } 
         if(lbl) lbl.innerText = text; 
     }
     
@@ -732,21 +681,20 @@
 
     // --- GENERATE ---
     function generateAndShowScript() {
+        // [Logic maintained from previous version, fully operational]
         const identity = document.getElementById('identityName').value;
-        let s = `# Script Gerado pelo MikroTik Architect v4.9\n/system identity set name="${identity}"\n\n`;
+        let s = `# Script Gerado pelo MikroTik Architect v5.0\n/system identity set name="${identity}"\n\n`;
         s += `# --- SERVIÇOS ---\n`;
         ipServicesList.forEach(svc => {
             const active = document.getElementById('svc_' + svc.id).checked; const port = document.getElementById('port_' + svc.id).value;
             if (!active) s += `/ip service disable ${svc.id}\n`; else { s += `/ip service enable ${svc.id}\n`; if (port != svc.port) s += `/ip service set ${svc.id} port=${port}\n`; }
         });
         
-        // Users
         s += `\n# --- USUÁRIOS ---\n`;
         s += `/user add name="${document.getElementById('adminName').value}" password="${document.getElementById('adminPass').value}" group=full comment="Admin"\n`;
         if(document.getElementById('removeDefaultAdmin').checked) s += `/user remove [find name="admin"]\n`;
         extraUsers.forEach(u => s += `/user add name="${u.name}" password="${u.pass}" group=read comment="Extra"\n`);
 
-        // Tools
         s += `\n# --- FERRAMENTAS ---\n`;
         if (document.getElementById('svc_snmp').checked) {
             let comm = document.getElementById('snmpComm').value || 'public'; let cont = document.getElementById('snmpContact').value; let loc = document.getElementById('snmpLoc').value;
@@ -757,12 +705,10 @@
         let reb = document.getElementById('autoReboot').value;
         if (reb !== 'no') { let interval = (reb === 'daily') ? '1d' : (reb === 'weekly') ? '7d' : document.getElementById('rebootInterval').value; s += `/system scheduler add name="AutoReboot" interval=${interval} on-event="/system reboot"\n`; }
 
-        // LAN
         const lanIp = document.getElementById('lanIp').value; const lanPool = document.getElementById('lanPool').value; const lanLease = document.getElementById('lanLease').value;
         s += `\n# --- LAN ---\n/interface bridge add name="bridge-LAN"\n/ip address add address=${lanIp} interface=bridge-LAN\n/ip pool add name=dhcp_pool ranges=${lanPool}\n/ip dhcp-server add name=dhcp1 interface=bridge-LAN address-pool=dhcp_pool disabled=no lease-time=${lanLease}\n`;
         s += `/ip dhcp-server network add address=${lanIp.replace(/\/.*$/,'.0') + '/' + lanIp.split('/')[1]} gateway=${lanIp.split('/')[0]} dns-server=8.8.8.8,1.1.1.1\n`;
 
-        // WAN
         const wan = document.getElementById('wanType').value;
         if(wan === 'dhcp') s += `\n# --- WAN (DHCP) ---\n/ip dhcp-client add interface=ether1 disabled=no\n/interface list member add interface=ether1 list=WAN\n`;
         else if(wan === 'pppoe') s += `\n# --- WAN (PPPoE) ---\n/interface pppoe-client add name="pppoe-out1" interface=ether1 user="${document.getElementById('pppoeUser').value}" password="${document.getElementById('pppoePass').value}" add-default-route=yes use-peer-dns=yes disabled=no\n/interface list member add interface=pppoe-out1 list=WAN\n`;
@@ -770,18 +716,15 @@
         s += `/interface list member add interface=bridge-LAN list=LAN\n`;
         s += `/ip firewall nat add action=masquerade chain=srcnat out-interface-list=WAN\n`;
 
-        // Corp
+        if(natRules.length > 0) { s += `\n# --- DST-NAT ---\n`; natRules.forEach(r => s += `/ip firewall nat add action=dst-nat chain=dstnat dst-port=${r.port} protocol=${r.proto} to-addresses=${r.ip} to-ports=${r.port} in-interface-list=WAN comment="${r.comment}"\n`); }
+
         if (document.getElementById('scenario').value === 'corporate') {
             s += `\n# --- FILTROS ---\n`;
             if (document.getElementById('blk_social').checked) s += `/ip firewall filter add chain=forward protocol=tcp content="facebook.com" action=drop comment="Block Social"\n`;
             if (document.getElementById('corp_queues').checked) { let dl = document.getElementById('corpDl').value; let ul = document.getElementById('corpUl').value; s += `/queue simple add name="Limit_Users" target=${lanIp.replace(/\/.*$/,'.0') + '/' + lanIp.split('/')[1]} max-limit=${ul}M/${dl}M\n`; }
         }
 
-        // Backup
         if (document.getElementById('bkp_email').checked) { let to = document.getElementById('bkp_to').value; s += `\n# --- BACKUP ---\n/system scheduler add name="EmailBackup" interval=7d on-event="/export file=bkp; /tool e-mail send to=${to} file=bkp.rsc subject=\\"Backup $[/system identity get name]\\"\\"\n`; }
-
-        // NAT
-        if(natRules.length > 0) { s += `\n# --- DST-NAT ---\n`; natRules.forEach(r => s += `/ip firewall nat add action=dst-nat chain=dstnat dst-port=${r.port} protocol=${r.proto} to-addresses=${r.ip} to-ports=${r.port} in-interface-list=WAN comment="${r.comment}"\n`); }
 
         document.getElementById('finalScript').value = s;
         openModal('scriptModal');
@@ -798,8 +741,7 @@
     function copyToClipboard() { navigator.clipboard.writeText(document.getElementById('finalScript').value); }
     function downloadScript() { const blob = new Blob([document.getElementById('finalScript').value], {type: "text/plain"}); const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "config.rsc"; a.click(); }
 
-    // Start
-    window.onload = init;
+    init();
 </script>
 </body>
 </html>
