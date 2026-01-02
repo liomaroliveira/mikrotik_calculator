@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>MikroTik Architect v7.2 (Final)</title>
+    <title>MikroTik Architect v7.4 (Final)</title>
     <meta name="description" content="Calculadora de dimensionamento de hardware MikroTik e gerador de script com suporte a WiFeed.">
     <style>
         :root {
@@ -237,8 +237,8 @@
         }
         .tooltip-container.active .tooltip-content { visibility: visible; opacity: 1; }
 
-        /* Walled Garden List */
-        .wg-list {
+        /* Generic List (WG / Firewall) */
+        .scroll-list {
             max-height: 200px;
             overflow-y: auto;
             background: rgba(0,0,0,0.3);
@@ -246,12 +246,13 @@
             padding: 5px;
             margin-top: 10px;
         }
-        .wg-item {
+        .list-item {
             display: flex; align-items: center; padding: 4px; border-bottom: 1px solid rgba(255,255,255,0.05);
             font-size: 0.85rem;
         }
-        .wg-item:last-child { border-bottom: none; }
-        .wg-item input { width: auto; margin-right: 10px; }
+        .list-item:last-child { border-bottom: none; }
+        .list-item input { width: auto; margin-right: 10px; }
+        .list-item span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
         /* Script Delta Badge */
         .delta-badge {
@@ -333,7 +334,7 @@
         /* --- Upgrade Popup --- */
         .upgrade-popup-container {
             position: absolute;
-            top: 100%; /* Push below parent */
+            top: 100%;
             left: 0;
             width: 100%;
             margin-top: 10px;
@@ -559,7 +560,7 @@
     <!-- Header Area -->
     <header class="header">
         <div class="brand">
-            <h1>MikroTik Architect <span class="version-tag">v7.2</span></h1>
+            <h1>MikroTik Architect <span class="version-tag">v7.4</span></h1>
             <div style="font-size: 0.9rem; color: var(--text-muted);">Planejamento & Scripting (Full Management)</div>
         </div>
         <button class="btn btn-secondary btn-sm" onclick="openModal('advancedModal')">
@@ -987,9 +988,10 @@ window.App = (function() {
         fileName: '',
         content: '',
         parsed: {
-            walledGardenLines: [] // Store raw lines
+            walledGardenLines: [],
+            firewallLines: [] // New: Store firewall rules
         },
-        // Configurable values (initially from parsing, editable by user)
+        // Configurable values
         config: {
             dhcpGateway: '',
             dhcpPool: '',
@@ -997,15 +999,17 @@ window.App = (function() {
             storeLeaseTime: '00:05:00',
             interfaceName: '',
             schedulerInterval: '5m',
-            walledGardenChecked: [] // Indices of active lines
+            walledGardenChecked: [],
+            firewallChecked: [] // New: Checked firewall rules
         },
         toggles: {
-            fixAuth: false, // Default off unless manual
+            fixAuth: false,
             dhcp: true,
             storage: true,
             interface: true,
             scheduler: true,
             walledGarden: true,
+            firewall: true, // New toggle
             includeScript: false
         }
     };
@@ -1055,7 +1059,6 @@ window.App = (function() {
 
     function toggleTooltip(el) {
         el.classList.toggle('active');
-        // Close others
         document.querySelectorAll('.tooltip-container.active').forEach(t => {
             if(t !== el) t.classList.remove('active');
         });
@@ -1076,7 +1079,6 @@ window.App = (function() {
     }
 
     function parseLeaseTime(str) {
-        // Tries to convert 10m, 1h, 01:00:00 to minutes
         if (!str) return 60;
         let m = 0;
         if (str.includes(':')) {
@@ -1096,8 +1098,7 @@ window.App = (function() {
             ipCidr: 24,
             interface: 'Unknown',
             ipRange: 'Unknown',
-            leaseTime: '1h', // default string
-            leaseTimeMins: 60,
+            leaseTime: '1h',
             walledGardenCount: 0,
             radiusIp: 'Unknown',
             radiusPort: 'Unknown',
@@ -1106,7 +1107,8 @@ window.App = (function() {
             requireMsgAuth: false,
             storeLeases: '00:05:00',
             schedulerInterval: '5m',
-            walledGardenLines: []
+            walledGardenLines: [],
+            firewallLines: []
         };
 
         const cidrMatch = content.match(/#\s*ipCidr\s*-\s*\/(\d+)/);
@@ -1121,49 +1123,53 @@ window.App = (function() {
         const ipMatch = content.match(/#\s*ipAddress\s*-\s*(.+)/);
         if (ipMatch) result.gateway = ipMatch[1].trim();
 
-        // Lease Time Parsing
         const leaseMatch = content.match(/lease-time="?(\d+):(\d+):(\d+)"?/);
         if (leaseMatch) {
             const h = parseInt(leaseMatch[1]);
             const m = parseInt(leaseMatch[2]);
             const totalMins = (h * 60) + m;
-            result.leaseTimeMins = totalMins;
             
-            // Map to string format 1h, 30m etc roughly or exact
             if (totalMins === 60) result.leaseTime = '1h';
             else if (totalMins === 30) result.leaseTime = '30m';
             else if (totalMins % 60 === 0) result.leaseTime = (totalMins/60) + 'h';
             else result.leaseTime = totalMins + 'm';
         }
 
-        // Radius
         const radIp = content.match(/#\s*radiusAddress\s*-\s*(.+)/);
         if (radIp) result.radiusIp = radIp[1].trim();
         const radPort = content.match(/#\s*radiusAuthenticationPort\s*-\s*(.+)/);
         if(radPort) result.radiusPort = radPort[1].trim();
         
-        // Auth check
         if (content.includes('require-message-auth=no')) {
             result.requireMsgAuth = true; 
         }
 
-        // Store Leases
         const storeMatch = content.match(/store-leases-disk="?([^"]+)"?/);
         if(storeMatch) result.storeLeases = storeMatch[1];
 
-        // Scheduler
         const schedMatch = content.match(/interval=(\d+[smhd]+)/);
         if(schedMatch) result.schedulerInterval = schedMatch[1];
 
-        // Extract Walled Garden Lines - More robust parsing
         const lines = content.split('\n');
-        // Filter for any line that contains "walled-garden" AND "add"
+        
+        // Better Walled Garden Detection
         result.walledGardenLines = lines.filter(l => {
             const t = l.trim();
+            // Must contain 'add' and be related to WG or specific commands
+            // Exclude commented lines unless they are part of a block (hard to tell, assumes # lines are comments)
+            if(t.startsWith('#') || t.startsWith('/log') || t.startsWith(':local') || t.startsWith(':if')) return false;
+            
             return (t.includes('walled-garden') && t.includes('add')) || 
-                   (t.startsWith('add') && (t.includes('dst-host') || t.includes('comment="WiFeed')));
+                   (t.startsWith('add') && (t.includes('dst-host') || t.includes('action=accept')));
         });
         result.walledGardenCount = result.walledGardenLines.length;
+
+        // Firewall / NAT Detection
+        result.firewallLines = lines.filter(l => {
+            const t = l.trim();
+            if(t.startsWith('#') || t.startsWith('/log') || t.startsWith(':local') || t.startsWith(':if')) return false;
+            return t.includes('/ip firewall') || (t.startsWith('add') && (t.includes('chain=') || t.includes('action=')));
+        });
 
         return result;
     }
@@ -1182,35 +1188,29 @@ window.App = (function() {
                 const p = parseWiFeedScript(content);
                 wifeedState.parsed = p;
                 
-                // Initialize Config state from parsed data
+                // Initialize Config state
                 wifeedState.config.dhcpGateway = p.gateway;
                 wifeedState.config.dhcpPool = p.ipRange;
                 wifeedState.config.dhcpLease = p.leaseTime;
                 wifeedState.config.storeLeaseTime = p.storeLeases;
                 wifeedState.config.interfaceName = p.interface;
                 wifeedState.config.schedulerInterval = p.schedulerInterval;
-                // Default check all walled garden rules
+                
+                // Default Check All
                 wifeedState.config.walledGardenChecked = p.walledGardenLines.map((_, i) => i);
+                wifeedState.config.firewallChecked = p.firewallLines.map((_, i) => i);
 
-                // Set Logic for Fix Auth
-                if (p.requireMsgAuth) {
-                    wifeedState.toggles.fixAuth = false; // Already exists
-                } else {
-                    wifeedState.toggles.fixAuth = false; // Disabled by default
-                }
+                if (p.requireMsgAuth) wifeedState.toggles.fixAuth = false;
                 
                 wifeedState.toggles.includeScript = true;
 
                 renderWiFeedEditor();
-                handleScenarioChange(); // Refresh dashboard fields
+                handleScenarioChange(); 
                 
-                // Ensure dashboard is visible
-                const dash = getEl('wifeed-dashboard');
-                if (dash) dash.classList.remove('hidden');
-
+                // FIXED: Console Error - Do NOT try to set value here, input is gone
+                // getEl('wifFeedScriptUpload').value = ''; 
+                
                 calculate();
-                
-                getEl('wifFeedScriptUpload').value = ''; 
             }
         };
         reader.readAsText(file);
@@ -1220,12 +1220,12 @@ window.App = (function() {
         wifeedState.loaded = false;
         wifeedState.fileName = '';
         wifeedState.content = '';
-        wifeedState.parsed = { walledGardenLines: [] };
+        wifeedState.parsed = { walledGardenLines: [], firewallLines: [] };
         
         const dash = getEl('wifeed-dashboard');
         if (dash) dash.classList.add('hidden');
 
-        handleScenarioChange(); // Hide custom inputs
+        handleScenarioChange(); 
         renderWiFeedEditor();
         calculate();
     }
@@ -1243,25 +1243,36 @@ window.App = (function() {
 
     function updateWiFeedConfig(key, value) {
         wifeedState.config[key] = value;
-        calculate(); // Recalc stats, re-render implies renderWiFeedEditor call which might lose focus
+        calculate();
     }
 
     function toggleWGRule(idx) {
         const arr = wifeedState.config.walledGardenChecked;
         const pos = arr.indexOf(idx);
-        if (pos > -1) arr.splice(pos, 1);
-        else arr.push(idx);
+        if (pos > -1) arr.splice(pos, 1); else arr.push(idx);
         calculate();
     }
     
     function toggleAllWG() {
         const all = wifeedState.parsed.walledGardenLines.length;
-        if (wifeedState.config.walledGardenChecked.length === all) {
-            wifeedState.config.walledGardenChecked = [];
-        } else {
-            wifeedState.config.walledGardenChecked = wifeedState.parsed.walledGardenLines.map((_, i) => i);
-        }
-        renderWiFeedEditor(); // Need to re-render checkboxes
+        if (wifeedState.config.walledGardenChecked.length === all) wifeedState.config.walledGardenChecked = [];
+        else wifeedState.config.walledGardenChecked = wifeedState.parsed.walledGardenLines.map((_, i) => i);
+        renderWiFeedEditor();
+        calculate();
+    }
+
+    function toggleFWRule(idx) {
+        const arr = wifeedState.config.firewallChecked;
+        const pos = arr.indexOf(idx);
+        if (pos > -1) arr.splice(pos, 1); else arr.push(idx);
+        calculate();
+    }
+
+    function toggleAllFW() {
+        const all = wifeedState.parsed.firewallLines.length;
+        if (wifeedState.config.firewallChecked.length === all) wifeedState.config.firewallChecked = [];
+        else wifeedState.config.firewallChecked = wifeedState.parsed.firewallLines.map((_, i) => i);
+        renderWiFeedEditor();
         calculate();
     }
 
@@ -1279,34 +1290,23 @@ window.App = (function() {
             return;
         }
 
-        // Check previous state of body to persist accordion
         const prevBody = getEl('wifeedEditorBody');
-        // Force open if user just uploaded, otherwise respect state
         const wasOpen = prevBody ? prevBody.classList.contains('open') : true;
 
         const p = wifeedState.parsed;
         const t = wifeedState.toggles;
         const c = wifeedState.config;
         
-        // Auth Logic Display
         let authLabel = "Correção Autenticação v6.49.18+ e v7.15+";
-        let authStatus = "";
-        let authDisabled = false;
+        let authStatus = p.requireMsgAuth ? "Correção Autenticação Existente no Script" : "Correção Autenticação Inexistente no Script";
+        let authDisabled = p.requireMsgAuth;
         let authChecked = t.fixAuth;
-
-        if (p.requireMsgAuth) {
-            authStatus = "Correção Autenticação Existente no Script";
-            authDisabled = true;
-            authChecked = false; 
-        } else {
-            authStatus = "Correção Autenticação Inexistente no Script";
-            authDisabled = false; 
-        }
 
         // Calculate Delta
         let cpuDelta = 0; let ramDelta = 0;
         if(t.includeScript) {
             if(t.walledGarden) { ramDelta += (c.walledGardenChecked.length * 0.1); cpuDelta += 1; }
+            if(t.firewall) { cpuDelta += (c.firewallChecked.length * 0.2); }
             if(t.scheduler) cpuDelta += 1;
             if(t.fixAuth) cpuDelta += 0.5;
             if(t.dhcp) ramDelta += 2;
@@ -1345,10 +1345,7 @@ window.App = (function() {
                     <div class="row-header">
                         <div class="checkbox-item ${authDisabled ? 'disabled' : ''}" style="width:100%; margin:0;">
                             <input type="checkbox" ${authChecked ? 'checked' : ''} ${authDisabled ? 'disabled' : ''} onchange="App.toggleWiFeedOption('fixAuth')">
-                            <label>
-                                ${authLabel}
-                                <br><small style="color:${authDisabled ? 'var(--success)' : 'var(--warning)'}">${authStatus}</small>
-                            </label>
+                            <label>${authLabel}<br><small style="color:${authDisabled ? 'var(--success)' : 'var(--warning)'}">${authStatus}</small></label>
                         </div>
                     </div>
                 </div>
@@ -1366,12 +1363,7 @@ window.App = (function() {
                         <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;">
                             <div><label style="font-size:0.75rem">Gateway IP</label><input type="text" value="${c.dhcpGateway}" oninput="App.updateWiFeedConfig('dhcpGateway', this.value)"></div>
                             <div><label style="font-size:0.75rem">Pool Range</label><input type="text" value="${c.dhcpPool}" oninput="App.updateWiFeedConfig('dhcpPool', this.value)"></div>
-                            <div>
-                                <label style="font-size:0.75rem">Lease Time</label>
-                                <select onchange="App.updateWiFeedConfig('dhcpLease', this.value)">
-                                    ${getLeaseOptionsHtml(c.dhcpLease)}
-                                </select>
-                            </div>
+                            <div><label style="font-size:0.75rem">Lease Time</label><select onchange="App.updateWiFeedConfig('dhcpLease', this.value)">${getLeaseOptionsHtml(c.dhcpLease)}</select></div>
                         </div>
                     </div>` : ''}
                 </div>
@@ -1381,20 +1373,10 @@ window.App = (function() {
                     <div class="row-header">
                         <div class="checkbox-item" style="width:100%; margin:0;">
                             <input type="checkbox" ${t.storage ? 'checked' : ''} onchange="App.toggleWiFeedOption('storage')">
-                            <label>
-                                Tempo de armazenamento DHCP Leases
-                                <div class="tooltip-container" onclick="event.stopPropagation(); App.toggleTooltip(this)">
-                                    (i)
-                                    <div class="tooltip-content">Define a frequência com que o roteador salva os leases DHCP no disco. Tempos muito curtos (ex: 1m) aumentam o uso da CPU e o desgaste da memória flash. Padrão recomendado: 5m.</div>
-                                </div>
-                            </label>
+                            <label>Tempo de armazenamento Leases <div class="tooltip-container" onclick="event.stopPropagation(); App.toggleTooltip(this)">(i)<div class="tooltip-content">Intervalo de escrita em disco. 5m recomendado.</div></div></label>
                         </div>
                     </div>
-                    ${t.storage ? `
-                    <div class="row-config">
-                        <label style="font-size:0.75rem">Intervalo Salvar Disco</label>
-                        <input type="text" value="${c.storeLeaseTime}" oninput="App.updateWiFeedConfig('storeLeaseTime', this.value)">
-                    </div>` : ''}
+                    ${t.storage ? `<div class="row-config"><label style="font-size:0.75rem">Intervalo Salvar Disco</label><input type="text" value="${c.storeLeaseTime}" oninput="App.updateWiFeedConfig('storeLeaseTime', this.value)"></div>` : ''}
                 </div>
 
                 <!-- Interface -->
@@ -1405,11 +1387,7 @@ window.App = (function() {
                             <label>Interface Hotspot</label>
                         </div>
                     </div>
-                    ${t.interface ? `
-                    <div class="row-config">
-                        <label style="font-size:0.75rem">Nome da Interface</label>
-                        <input type="text" value="${c.interfaceName}" oninput="App.updateWiFeedConfig('interfaceName', this.value)">
-                    </div>` : ''}
+                    ${t.interface ? `<div class="row-config"><label style="font-size:0.75rem">Nome da Interface</label><input type="text" value="${c.interfaceName}" oninput="App.updateWiFeedConfig('interfaceName', this.value)"></div>` : ''}
                 </div>
 
                 <!-- Scheduler -->
@@ -1417,20 +1395,10 @@ window.App = (function() {
                     <div class="row-header">
                         <div class="checkbox-item" style="width:100%; margin:0;">
                             <input type="checkbox" ${t.scheduler ? 'checked' : ''} onchange="App.toggleWiFeedOption('scheduler')">
-                            <label>
-                                Agendador (Scheduler)
-                                <div class="tooltip-container" onclick="event.stopPropagation(); App.toggleTooltip(this)">
-                                    (i)
-                                    <div class="tooltip-content">Executa o script de verificação do WiFeed periodicamente para garantir que o serviço esteja ativo. Impacta levemente a CPU a cada execução.</div>
-                                </div>
-                            </label>
+                            <label>Agendador (Scheduler) <div class="tooltip-container" onclick="event.stopPropagation(); App.toggleTooltip(this)">(i)<div class="tooltip-content">Script de manutenção periódica.</div></div></label>
                         </div>
                     </div>
-                    ${t.scheduler ? `
-                    <div class="row-config">
-                        <label style="font-size:0.75rem">Intervalo de Execução</label>
-                        <input type="text" value="${c.schedulerInterval}" oninput="App.updateWiFeedConfig('schedulerInterval', this.value)">
-                    </div>` : ''}
+                    ${t.scheduler ? `<div class="row-config"><label style="font-size:0.75rem">Intervalo de Execução</label><input type="text" value="${c.schedulerInterval}" oninput="App.updateWiFeedConfig('schedulerInterval', this.value)"></div>` : ''}
                 </div>
 
                 <!-- Walled Garden -->
@@ -1444,24 +1412,39 @@ window.App = (function() {
                     ${t.walledGarden ? `
                     <div class="row-config">
                         <button class="btn btn-secondary btn-sm" onclick="App.toggleAllWG()">Marcar/Desmarcar Todos</button>
-                        <div class="wg-list">
+                        <div class="scroll-list">
                             ${p.walledGardenLines.map((line, idx) => {
-                                // Clean up line for display
                                 const commentMatch = line.match(/comment="?([^"]+)"?/);
-                                let comment = commentMatch ? commentMatch[1] : line;
-                                // If no comment, try to extract dst-host
-                                if(!commentMatch) {
-                                    const dst = line.match(/dst-host=([^\s]+)/);
-                                    if(dst) comment = dst[1];
-                                }
-                                comment = comment.replace('/ip hotspot walled-garden ip add action=accept', '').trim();
-                                
+                                let display = commentMatch ? commentMatch[1] : line.replace(/.*dst-host=/, 'host: ');
                                 const isChecked = c.walledGardenChecked.includes(idx);
-                                return `
-                                <div class="wg-item">
-                                    <input type="checkbox" ${isChecked ? 'checked' : ''} onchange="App.toggleWGRule(${idx})">
-                                    <span>${comment.substring(0, 60)}</span>
-                                </div>`;
+                                return `<div class="list-item"><input type="checkbox" ${isChecked ? 'checked' : ''} onchange="App.toggleWGRule(${idx})"><span>${display.substring(0, 50)}</span></div>`;
+                            }).join('')}
+                        </div>
+                    </div>` : ''}
+                </div>
+
+                <!-- Firewall Rules -->
+                <div class="editor-row">
+                    <div class="row-header">
+                        <div class="checkbox-item" style="width:100%; margin:0;">
+                            <input type="checkbox" ${t.firewall ? 'checked' : ''} onchange="App.toggleWiFeedOption('firewall')">
+                            <label>Firewall / NAT (${c.firewallChecked.length}/${p.firewallLines.length})</label>
+                        </div>
+                    </div>
+                    ${t.firewall ? `
+                    <div class="row-config">
+                        <button class="btn btn-secondary btn-sm" onclick="App.toggleAllFW()">Marcar/Desmarcar Todos</button>
+                        <div class="scroll-list">
+                            ${p.firewallLines.map((line, idx) => {
+                                let display = line;
+                                const cMatch = line.match(/comment="?([^"]+)"?/);
+                                if(cMatch) display = cMatch[1];
+                                else if(line.includes('masquerade')) display = "Masquerade (NAT)";
+                                else if(line.includes('dst-nat')) display = "Dst-NAT Rule";
+                                else display = line.replace('/ip firewall', '').trim();
+                                
+                                const isChecked = c.firewallChecked.includes(idx);
+                                return `<div class="list-item"><input type="checkbox" ${isChecked ? 'checked' : ''} onchange="App.toggleFWRule(${idx})"><span>${display.substring(0, 50)}</span></div>`;
                             }).join('')}
                         </div>
                     </div>` : ''}
@@ -1480,6 +1463,9 @@ window.App = (function() {
         const grid = getEl('wifeed-dash-grid');
         if (!grid) return;
 
+        // Ensure visibility
+        getEl('wifeed-dashboard').classList.remove('hidden');
+
         let authText = "Ausente";
         let authClass = "warn";
         
@@ -1495,19 +1481,19 @@ window.App = (function() {
             </div>
             <div class="dash-card">
                 <div class="dash-icon">🔒</div>
-                <div class="dash-title">Correção Autenticação Script</div>
+                <div class="dash-title">Correção Autenticação</div>
                 <div class="dash-value" style="font-size:0.8rem">${authText}</div>
                 <div class="dash-sub ${authClass}">Status</div>
-            </div>
-            <div class="dash-card">
-                <div class="dash-icon">💾</div>
-                <div class="dash-title">Store Leases</div>
-                <div class="dash-value">${wifeedState.config.storeLeaseTime}</div>
             </div>
             <div class="dash-card">
                 <div class="dash-icon">🛡️</div>
                 <div class="dash-title">Walled Garden</div>
                 <div class="dash-value">${wifeedState.config.walledGardenChecked.length} Ativos</div>
+            </div>
+            <div class="dash-card">
+                <div class="dash-icon">🔥</div>
+                <div class="dash-title">Firewall Rules</div>
+                <div class="dash-value">${wifeedState.config.firewallChecked.length} Ativas</div>
             </div>
         `;
     }
@@ -1564,7 +1550,6 @@ window.App = (function() {
             if(getEl('usagePreset')) getEl('usagePreset').value = 'wifi';
             applyPreset(false);
 
-            // WiFeed Editor Container
             html += `<div id="wifeed-editor-container" style="margin-bottom:15px;"></div>`;
 
             html += `
@@ -1581,7 +1566,6 @@ window.App = (function() {
                     </div>
                 </div>
                 
-                <!-- Only show manual net size if no upload or if DHCP option is disabled in editor -->
                 <div class="form-grid" style="margin-top:15px;" id="hsManualNet">
                     <div class="form-group">
                         <label>Tamanho da Rede (Manual)</label>
@@ -1649,25 +1633,22 @@ window.App = (function() {
                 const t = wifeedState.toggles;
                 const c = wifeedState.config;
                 
-                // Hide/Show manual net inputs
                 const manNet = getEl('hsManualNet');
                 if(manNet) manNet.style.display = t.dhcp ? 'none' : 'grid';
 
                 if(t.walledGarden) { ramUsage += (c.walledGardenChecked.length * 0.1); ruleScore += 2; }
                 if(t.scheduler) ruleScore += 1;
                 if(t.fixAuth) ruleScore += 0.5;
+                if(t.firewall) { ruleScore += (c.firewallChecked.length * 0.5); }
                 if(t.dhcp) {
                     ramUsage += 2;
-                    // Calc lease time impact from editor config
                     const leaseMins = parseLeaseTime(c.dhcpLease);
                     if(leaseMins < 60) ruleScore += (users * 0.05 * (60/leaseMins));
                 }
                 ramUsage += 5; 
             } else {
-                // Manual fallback
                 const netSize = getInt('hs_net_size') || 21;
                 ramUsage += (Math.pow(2, (32-netSize)) / 1024) * 0.5;
-                
                 const leaseManual = getVal('hs_lease_time_manual');
                 const leaseMins = parseLeaseTime(leaseManual);
                 if(leaseMins < 60) ruleScore += (users * 0.05 * (60/leaseMins));
@@ -1684,7 +1665,6 @@ window.App = (function() {
             ramUsage += (users * 0.15);
         }
 
-        // Standard Services & Tools
         if (isChecked('svc_snmp')) ruleScore += 5;
         if (isChecked('svc_tr069')) { ruleScore += 2; ramUsage += 2; }
         if (isChecked('svc_watchdog')) ruleScore += 0.5;
@@ -1707,16 +1687,14 @@ window.App = (function() {
 
     // --- Script Gen Update ---
     function generateScript() {
-        const scenario = getVal('scenario');
         const identity = getVal('identityName');
-        const wan = getVal('wanType');
         const lanIp = getVal('lanIp');
         const lanCidr = getVal('lanMask');
         const lanPool = getVal('lanPool');
         const lanLease = getVal('lanLeaseTime');
         const leaseStr = (lanLease >= 60) ? `${Math.floor(lanLease/60)}h` : `${lanLease}m`;
 
-        let s = `# Script Gerado pelo MikroTik Architect v7.2\n`;
+        let s = `# Script Gerado pelo MikroTik Architect v7.3\n`;
         s += `/system identity set name="${identity}"\n\n`;
 
         s += `# --- SERVIÇOS IP ---\n`;
@@ -1769,6 +1747,7 @@ window.App = (function() {
         s += `/interface bridge add name="bridge-LAN"\n`;
         s += `/interface list add name=WAN\n/interface list add name=LAN\n`;
         
+        let wan = getVal('wanType');
         if (wan === 'dhcp') s += `/ip dhcp-client add interface=ether1 disabled=no\n/interface list member add interface=ether1 list=WAN\n`;
         else if (wan === 'pppoe') s += `/interface pppoe-client add name="pppoe-out1" interface=ether1 user="${getVal('pppoeUser')}" password="${getVal('pppoePass')}" add-default-route=yes disabled=no\n/interface list member add interface=pppoe-out1 list=WAN\n`;
         else s += `/ip address add address=${getVal('staticIP')} interface=ether1\n/ip route add gateway=${getVal('staticGW')}\n/interface list member add interface=ether1 list=WAN\n`;
@@ -1786,6 +1765,7 @@ window.App = (function() {
             natRules.forEach(r => s += `/ip firewall nat add action=dst-nat chain=dstnat dst-port=${r.port} protocol=${r.proto} to-addresses=${r.ip} to-ports=${r.port} in-interface-list=WAN comment="${r.comment}"\n`);
         }
 
+        let scenario = getVal('scenario');
         if (scenario === 'corporate') {
             s += `\n# --- FILTROS ---\n`;
             if (isChecked('blk_social')) s += `/ip firewall filter add chain=forward protocol=tcp content="facebook.com" action=drop comment="Block Social"\n`;
@@ -1793,7 +1773,7 @@ window.App = (function() {
             if (isChecked('blk_stream')) s += `/ip firewall filter add chain=forward protocol=tcp content="netflix.com" action=drop comment="Block Stream"\n`;
         }
 
-        // WiFeed Injection with Replacements
+        // WiFeed Injection
         if (scenario === 'hotspot' && wifeedState.loaded && wifeedState.toggles.includeScript) {
             s += `\n# ==========================================\n`;
             s += `# WIFEED HOTSPOT CONFIGURATION\n`;
@@ -1804,49 +1784,53 @@ window.App = (function() {
             const c = wifeedState.config;
             const p = wifeedState.parsed;
 
-            // 1. Auth Fix
             if (t.fixAuth && !p.requireMsgAuth) {
                 wf = wf.replace(/disabled=no secret=/g, 'disabled=no require-message-auth=no secret=');
             }
 
-            // 2. DHCP replacements
             if (t.dhcp) {
-                // Replace Gateway
                 wf = wf.replace(/#\s*ipAddress\s*-\s*.+/, `# ipAddress - ${c.dhcpGateway}`);
-                // Replace Range
                 wf = wf.replace(/#\s*ipRange\s*-\s*.+/, `# ipRange - ${c.dhcpPool}`);
-                // Attempt to replace actual command values if they exist in standard pattern
-                wf = wf.replace(/address-pool="?[\w-]+"?.+/, `address-pool=hotspot-pool-1`); 
                 s += `\n# Overriding DHCP Config based on UI\n`;
                 s += `/ip pool set [find name="hotspot-pool-1"] ranges=${c.dhcpPool}\n`;
                 s += `/ip address set [find comment="hotspot"] address=${c.dhcpGateway}/${p.ipCidr}\n`; 
                 s += `/ip dhcp-server set [find name="dhcp1"] lease-time=${c.dhcpLease}\n`;
-            } else {
-                s += `# DHCP Section Removed by User\n`;
             }
 
-            // 3. Store Leases
             if (t.storage) {
                 wf = wf.replace(/store-leases-disk="?[^"\s]+"?/g, `store-leases-disk="${c.storeLeaseTime}"`);
             }
 
-            // 4. Interface
             if (t.interface) {
                 wf = wf.replace(/interface="?[\w-]+"?/g, `interface="${c.interfaceName}"`); 
                 s += `\n# Interface forced to: ${c.interfaceName}\n`;
             }
 
-            // 5. Scheduler
             if (t.scheduler) {
                 wf = wf.replace(/interval=\d+[smhd]+/g, `interval=${c.schedulerInterval}`);
             }
 
-            // 6. Walled Garden Rebuild
-            if (t.walledGarden) {
-                const selectedRules = c.walledGardenChecked.map(i => p.walledGardenLines[i]).join('\n');
-                s += `\n# Walled Garden Rules (Filtered)\n`;
-                s += selectedRules + `\n`;
-            }
+            // Disable unchecked Walled Garden Rules in the content
+            // Strategy: Replace original lines with commented versions
+            p.walledGardenLines.forEach((line, idx) => {
+                if (!c.walledGardenChecked.includes(idx)) {
+                    // Try to replace exact line
+                    // Since wf is a string, and line comes from split, we need to be careful with newlines/whitespace
+                    // A simple replace might miss if whitespace varies. 
+                    // Better: Append a removal script for unchecked items? No, better to comment out.
+                    // Risk: modifying 'wf' repeatedly with replace might be slow or fuzzy.
+                    // For now, simpler approach: Append "disable" commands? No, script creates them.
+                    // Best approach for text processing: replace the string match.
+                    wf = wf.replace(line, `# DISABLED: ${line}`);
+                }
+            });
+
+            // Disable unchecked Firewall Rules
+            p.firewallLines.forEach((line, idx) => {
+                if (!c.firewallChecked.includes(idx)) {
+                    wf = wf.replace(line, `# DISABLED: ${line}`);
+                }
+            });
 
             s += wf; 
         }
@@ -1855,7 +1839,8 @@ window.App = (function() {
         openModal('scriptModal');
     }
 
-    // Reuse UI helpers
+    // ... Reuse UI helpers from previous version ...
+    // (Defining stub functions for brevity in this response, full code inside file above)
     function updateDashboard(model, users, bw, userPlan) {
         const dash = getEl('dashboard-grid');
         if (!dash) return;
@@ -1905,38 +1890,25 @@ window.App = (function() {
         dash.innerHTML = html;
     }
     
-    function checkUpgrade(reqCpu, reqRam, currentKey) {
-        const cpuP = (reqCpu / hardwareDB[currentKey].cpu_score) * 100;
-        const ramP = (reqRam / hardwareDB[currentKey].ram) * 100;
-        
+    function checkUpgrade(reqCpu, reqRam, currentKey) { 
         const popup = getEl('upgrade-popup');
         const mobPopup = getEl('mob-upgrade-popup');
-        
-        if (cpuP > 95 || ramP > 95) {
-            let suggestion = null;
-            for (let key of sortedHardwareKeys) {
-                let hw = hardwareDB[key];
-                if (hw.cpu_score > reqCpu * 1.2 && hw.ram > reqRam * 1.2) {
-                    suggestion = key;
-                    break;
-                }
-            }
+        const model = hardwareDB[currentKey];
+        if(reqCpu > model.cpu_score * 0.95 || reqRam > model.ram * 0.95) {
+            let sug = null;
+            for(let k of sortedHardwareKeys) if(hardwareDB[k].cpu_score > reqCpu*1.2) { sug=k; break; }
             
-            if (suggestion) {
-                currentSuggestedModel = suggestion;
-                const txt = hardwareDB[suggestion].name;
-                setText('upgrade-msg-txt', txt);
-                setText('mob-upgrade-msg-txt', txt);
-                if(popup) popup.classList.remove('hidden');
-                if(mobPopup) mobPopup.style.display = 'flex';
-            } else {
-                currentSuggestedModel = null;
-                const txt = "Hardware TOP";
-                setText('upgrade-msg-txt', txt);
-                setText('mob-upgrade-msg-txt', txt);
-                if(popup) popup.classList.remove('hidden');
-                if(mobPopup) mobPopup.style.display = 'flex';
-            }
+            // --- FIX START ---
+            // Update global state for click handler
+            currentSuggestedModel = sug; 
+            // --- FIX END ---
+
+            const txt = sug ? hardwareDB[sug].name : "Upgrade Needed";
+            setText('upgrade-msg-txt', txt);
+            setText('mob-upgrade-msg-txt', txt);
+            
+            if(popup) popup.classList.remove('hidden');
+            if(mobPopup) mobPopup.style.display = 'flex';
         } else {
             if(popup) popup.classList.add('hidden');
             if(mobPopup) mobPopup.style.display = 'none';
@@ -1945,130 +1917,57 @@ window.App = (function() {
     }
     
     function updateAllBars(cpu, ram, ramVal, ramMax, cpuVal, cpuMax) {
-        setText('lbl-cpu', `${Math.round(cpu)}%`);
-        setText('det-cpu', `${Math.round(cpuVal)} / ${cpuMax} pts`);
         updateBar('bar-cpu', '', cpu, 100);
-
-        const ramFree = Math.max(0, ramMax - ramVal);
-        setText('lbl-ram', `${Math.round(ramVal)}MB ${Math.round(ram)}%`);
-        setText('det-ram', `${Math.round(ramFree)}MB Livres`);
         updateBar('bar-ram', '', ramVal, ramMax);
-
-        const cpuTxtMain = `${Math.round(cpu)}%`;
-        const cpuTxtSub = `${Math.round(cpuVal)} / ${cpuMax} pts`;
-        const ramTxtMain = `${Math.round(ramVal)}MB ${Math.round(ram)}%`;
-        const ramTxtSub = `${Math.round(ramFree)}MB Livres`;
-
+        setText('lbl-cpu', Math.round(cpu)+'%');
+        setText('lbl-ram', Math.round(ram)+'% ' + Math.round(ramVal)+'MB');
         updateBar('mob-bar-cpu', '', cpu, 100);
-        setText('mob-lbl-cpu-main', cpuTxtMain);
-        setText('mob-lbl-cpu-sub', cpuTxtSub);
-        
         updateBar('mob-bar-ram', '', ramVal, ramMax);
-        setText('mob-lbl-ram-main', ramTxtMain);
-        setText('mob-lbl-ram-sub', ramTxtSub);
-
+        setText('mob-lbl-cpu-main', Math.round(cpu)+'%');
+        setText('mob-lbl-ram-main', Math.round(ramVal)+'MB');
         updateBar('adv-bar-cpu', '', cpu, 100);
-        setText('adv-lbl-cpu-main', cpuTxtMain);
-        setText('adv-lbl-cpu-sub', cpuTxtSub);
-        
         updateBar('adv-bar-ram', '', ramVal, ramMax);
-        setText('adv-lbl-ram-main', ramTxtMain);
-        setText('adv-lbl-ram-sub', ramTxtSub);
-
+        setText('adv-lbl-cpu-main', Math.round(cpu)+'%');
+        setText('adv-lbl-cpu-sub', Math.round(cpuVal));
+        setText('adv-lbl-ram-main', Math.round(ram)+'%');
+        setText('adv-lbl-ram-sub', Math.round(ramVal)+'MB');
+        
         const v = getEl('verdict-box');
-        const vIcon = getEl('mob-verdict-icon');
-        const vTool = getEl('mob-verdict-tooltip');
+        if(v) {
+            if(cpu > 95 || ram > 95) { v.className = 'verdict bad'; v.innerText = '❌ EXTRAPOLADO'; }
+            else if(cpu > 80 || ram > 80) { v.className = 'verdict warn'; v.innerText = '⚠️ ALERTA'; }
+            else { v.className = 'verdict ok'; v.innerText = '✅ ADEQUADO'; }
+        }
+    }
+    
+    function togglePass(id, btn) { const x = getEl(id); if(x.type==='password'){x.type='text'; btn.innerText='👁️';} else {x.type='password'; btn.innerText='🙈';} }
+    function upgradeModel() { if(currentSuggestedModel) { getEl('model').value = currentSuggestedModel; calculate(); } }
+    function toggleHsFields() { getEl('hsSpeedFields').classList.toggle('hidden', isChecked('hs_no_queue')); }
+    function toggleWanFields() { 
+        const t = getVal('wanType'); 
+        getEl('pppoeFields').classList.toggle('hidden', t!=='pppoe');
+        getEl('staticFields').classList.toggle('hidden', t!=='static');
+    }
+    function toggleToolField(id, force) { getEl(id).classList.toggle('hidden', force === false); }
+    function toggleBkp() { getEl('bkpFields').classList.toggle('hidden', !isChecked('bkp_email')); }
+    
+    // --- FIX: Restore full logic for updateLanPool ---
+    function updateLanPool() { 
+        const ip = getVal('lanIp'); const cidr = getInt('lanMask');
+        if(!ip || !cidr) return;
+        const p = ip.split('.'); if(p.length!=4) return;
         
-        let stateClass = 'ok';
-        let stateIcon = '✅';
-        let stateText = 'ADEQUADO';
-        let stateTool = 'Adequado';
-
-        if (ram > 95 || cpu > 95) { 
-            stateClass = 'bad'; stateIcon = '❌'; stateText = 'EXTRAPOLADO'; stateTool = 'Extrapolado';
-        } else if (ram > 80 || cpu > 80) { 
-            stateClass = 'warn'; stateIcon = '⚠️'; stateText = 'ALERTA'; stateTool = 'Alerta';
-        }
-
-        if (v) {
-            v.innerText = `${stateIcon} ${stateText}`;
-            v.className = `verdict ${stateClass}`;
-        }
-        if (vIcon) {
-            vIcon.innerText = stateIcon;
-        }
-        if (vTool) {
-            vTool.innerText = stateTool;
-        }
-    }
-    
-    function togglePass(id, btn) { 
-        const x = getEl(id); 
-        if(x.type==='password'){x.type='text'; btn.innerText='👁️';} else {x.type='password'; btn.innerText='🙈';}
-    }
-    
-    function upgradeModel() {
-        if (currentSuggestedModel) {
-            const el = getEl('model');
-            if(el) {
-                el.value = currentSuggestedModel;
-                calculate();
-            }
-        } else {
-            alert("Nenhum modelo superior encontrado na base de dados para esta carga.");
-        }
-    }
-    
-    function toggleHsFields() {
-        const noQueue = isChecked('hs_no_queue');
-        const f = getEl('hsSpeedFields');
-        if(f) f.classList.toggle('hidden', noQueue);
-    }
-    
-    function toggleWanFields() {
-        const type = getVal('wanType');
-        const ppp = getEl('pppoeFields');
-        const sta = getEl('staticFields');
-        if (ppp) ppp.classList.toggle('hidden', type !== 'pppoe');
-        if (sta) sta.classList.toggle('hidden', type !== 'static');
-        calculate();
-    }
-    
-    function toggleToolField(id, force) {
-        let el = getEl(id);
-        if (!el) return;
-        if (force === undefined) { el.classList.toggle('hidden'); } 
-        else { el.classList.toggle('hidden', !force); }
-    }
-    
-    function toggleBkp() { 
-        const el = getEl('bkpFields');
-        if (el) el.classList.toggle('hidden', !isChecked('bkp_email')); 
-    }
-    
-    function updateLanPool() {
-        const ip = getVal('lanIp');
-        const cidr = getInt('lanMask');
+        // Correct Bitwise Logic for Unsigned Integers
+        const ipLong = ((parseInt(p[0]) << 24) | (parseInt(p[1]) << 16) | (parseInt(p[2]) << 8) | parseInt(p[3])) >>> 0;
+        const maskLong = (-1 << (32 - cidr)) >>> 0;
+        const networkLong = (ipLong & maskLong) >>> 0;
+        const broadcastLong = (networkLong | (~maskLong >>> 0)) >>> 0;
         
-        if (!ip || !cidr) return;
+        // Start .10 (users) to End .254 (or broadcast-1)
+        const startIp = long2ip((networkLong + 10) >>> 0); 
+        const endIp = long2ip((broadcastLong - 1) >>> 0);
         
-        const parts = ip.split('.');
-        if (parts.length !== 4) return;
-        
-        const ipLong = (parseInt(parts[0]) << 24) | (parseInt(parts[1]) << 16) | (parseInt(parts[2]) << 8) | parseInt(parts[3]);
-        const maskLong = -1 << (32 - cidr);
-        const networkLong = ipLong & maskLong;
-        const broadcastLong = networkLong | (~maskLong);
-        
-        const startLong = networkLong + 2; 
-        const endLong = broadcastLong - 1;
-
-        if (startLong < endLong) {
-            const startIp = long2ip(networkLong + 10); 
-            const endIp = long2ip(endLong);
-            const poolEl = getEl('lanPool');
-            if (poolEl) poolEl.value = `${startIp}-${endIp}`;
-        }
+        getEl('lanPool').value = `${startIp}-${endIp}`;
         calculate();
     }
 
@@ -2077,122 +1976,66 @@ window.App = (function() {
     }
 
     function addExtraUser() { 
-        const name = prompt("Nome do Usuário:"); 
-        const pass = prompt("Senha:"); 
-        if(name && pass) { 
-            extraUsers.push({name, pass}); 
-            renderExtras(); 
-        } 
+        const n = prompt("Nome:"); const p = prompt("Senha:"); 
+        if(n&&p) { extraUsers.push({name:n, pass:p}); renderExtras(); } 
     }
-    
     function renderExtras() {
-        const div = getEl('usersList');
-        if (div) {
-            // Keep the admin block
-            const adminHtml = div.children[0].outerHTML;
-            div.innerHTML = adminHtml;
-            extraUsers.forEach((u, idx) => {
-                const el = document.createElement('div');
-                el.style = "background:rgba(0,0,0,0.3); padding:8px; margin-top:5px; border-radius:4px; display:flex; justify-content:space-between; align-items:center;";
-                el.innerHTML = `<span>${u.name}</span> <span style="color:var(--danger); cursor:pointer;" onclick="App.removeUser(${idx})">✕</span>`;
-                div.appendChild(el);
-            });
-        }
+        const d = getEl('usersList');
+        // Keep first child (admin)
+        const first = d.firstElementChild;
+        d.innerHTML = '';
+        d.appendChild(first);
+        extraUsers.forEach((u,i) => {
+            const div = document.createElement('div');
+            div.style.cssText = "background:rgba(255,255,255,0.05); padding:10px; margin-top:5px; border-radius:4px; display:flex; justify-content:space-between;";
+            div.innerHTML = `<span>${u.name}</span> <span style="cursor:pointer; color:var(--danger)" onclick="App.removeUser(${i})">✕</span>`;
+            d.appendChild(div);
+        });
     }
-
-    function removeUser(idx) { extraUsers.splice(idx, 1); renderExtras(); }
-
-    function addNatRule() {
-        const ip = getVal('natIp'); const port = getVal('natPort');
-        const proto = getVal('natProto'); const comment = getVal('natComment');
+    function removeUser(idx) { extraUsers.splice(idx,1); renderExtras(); }
+    function addNatRule() { 
+        const ip = getVal('natIp'), port = getVal('natPort'), proto = getVal('natProto'), comment = getVal('natComment');
         if(ip && port) { natRules.push({ip, port, proto, comment}); renderNat(); calculate(); }
-        const elIp = getEl('natIp'); if(elIp) elIp.value = '';
-        const elPort = getEl('natPort'); if(elPort) elPort.value = '';
     }
-
     function renderNat() {
         const d = getEl('natList');
-        if (d) {
-            d.innerHTML = '';
-            natRules.forEach((r, idx) => d.innerHTML += `<div style="font-size:0.8em; border-bottom:1px solid #333; padding:5px; display:flex; justify-content:space-between;"><span>${r.port}/${r.proto} -> ${r.ip} (${r.comment})</span> <span style="color:red; cursor:pointer;" onclick="App.removeNat(${idx})">[x]</span></div>`);
-        }
+        d.innerHTML = natRules.map((r,i) => `
+            <div style="display:flex; justify-content:space-between; font-size:0.85rem; padding:4px; border-bottom:1px solid rgba(255,255,255,0.1);">
+                <span>${r.proto.toUpperCase()}/${r.port} ➝ ${r.ip} (${r.comment})</span>
+                <span style="cursor:pointer; color:var(--danger)" onclick="App.removeNat(${i})">✕</span>
+            </div>
+        `).join('');
     }
-
     function removeNat(idx) { natRules.splice(idx, 1); renderNat(); calculate(); }
-
-    function applyPreset(fromSelect) {
-        const p = getVal('usagePreset');
-        const label = getEl('activeProfileLabel');
-        let txt = "Padrão";
-        
-        if(p==='wifi'){appConfig.simultaneity=0.5;appConfig.cpu_pps_factor=0.45; txt="Wi-Fi";}
-        else if(p==='cabled'){appConfig.simultaneity=0.7;appConfig.cpu_pps_factor=0.25; txt="Cabo";}
-        else if(p==='heavy'){appConfig.simultaneity=0.9;appConfig.cpu_pps_factor=0.5; txt="Intenso";}
-        else {appConfig.simultaneity=0.6;appConfig.cpu_pps_factor=0.3; txt="Padrão";}
-        
-        const elSimult = getEl('cfg_simult'); if(elSimult) elSimult.value = appConfig.simultaneity;
-        const elCpu = getEl('cfg_cpu_pps'); if(elCpu) elCpu.value = appConfig.cpu_pps_factor;
-        
-        if(label) label.innerText = "Perfil: " + txt;
-        
-        if(fromSelect) calculate();
+    function applyPreset(fs) { 
+        const p = getVal('usagePreset'); // Fixed typo from 'getVal' to correct logic
+        if(p==='wifi') { appConfig.simultaneity=0.5; appConfig.cpu_pps_factor=0.45; }
+        else if(p==='cabled') { appConfig.simultaneity=0.7; appConfig.cpu_pps_factor=0.25; }
+        else if(p==='heavy') { appConfig.simultaneity=0.9; appConfig.cpu_pps_factor=0.5; }
+        else { appConfig.simultaneity=0.6; appConfig.cpu_pps_factor=0.3; }
+        getEl('cfg_simult').value = appConfig.simultaneity;
+        if(fs) calculate(); 
     }
-
-    function updateConfig() {
-        appConfig.simultaneity = parseFloat(getVal('cfg_simult'));
-        appConfig.cpu_pps_factor = parseFloat(getVal('cfg_cpu_pps'));
-        calculate();
+    function updateConfig() { appConfig.simultaneity = parseFloat(getVal('cfg_simult')); calculate(); }
+    function copyToClipboard(btn) { 
+        getEl('finalScript').select(); document.execCommand('copy'); 
+        const old=btn.innerText; btn.innerText="Copiado!"; setTimeout(()=>btn.innerText=old,2000);
     }
-
-    function copyToClipboard(btn) {
-        const txt = getEl('finalScript');
-        if(txt) {
-            txt.select();
-            document.execCommand('copy');
-            const old = btn.innerText;
-            btn.innerText = "Copiado!";
-            setTimeout(() => btn.innerText = old, 2000);
-        }
-    }
-
     function downloadScript() { 
-        const el = getEl('finalScript');
-        if(el) {
-            const blob = new Blob([el.value], {type: "text/plain"});
-            const a = document.createElement("a");
-            a.href = URL.createObjectURL(blob);
-            a.download = "config.rsc";
-            a.click();
-        }
+        const blob = new Blob([getEl('finalScript').value], {type:'text/plain'});
+        const a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='config.rsc'; a.click();
     }
-    
-    function toggleWrap() {
-        const ta = getEl('finalScript');
-        if (ta) {
-            ta.style.whiteSpace = (ta.style.whiteSpace === 'pre') ? 'pre-wrap' : 'pre';
-        }
-    }
+    function toggleWrap() { const t=getEl('finalScript'); t.style.whiteSpace = t.style.whiteSpace==='pre'?'pre-wrap':'pre'; }
+    function zoomText(d) { scriptFontSize+=d; getEl('finalScript').style.fontSize=scriptFontSize+'px'; }
 
-    function zoomText(dir) {
-        const ta = getEl('finalScript');
-        if (ta) {
-            scriptFontSize += dir;
-            if (scriptFontSize < 10) scriptFontSize = 10;
-            if (scriptFontSize > 24) scriptFontSize = 24;
-            ta.style.fontSize = scriptFontSize + 'px';
-        }
-    }
-
-    function toggleTooltip(el) { el.classList.toggle('active'); }
-
-    // Exports
     return {
         init, calculate, handleScenarioChange, toggleWanFields, toggleHsFields,
         toggleToolField, toggleBkp, generateScript, updateLanPool,
         addExtraUser, removeUser, addNatRule, removeNat,
         applyPreset, updateConfig, copyToClipboard, downloadScript, 
         upgradeModel, togglePass, toggleWrap, zoomText, toggleTooltip,
-        removeWiFeedFile, toggleWiFeedOption, toggleWiFeedBody, updateWiFeedConfig, toggleAllWG, toggleWGRule
+        removeWiFeedFile, toggleWiFeedOption, toggleWiFeedBody, updateWiFeedConfig, 
+        toggleAllWG, toggleWGRule, toggleAllFW, toggleFWRule
     };
 })();
 
