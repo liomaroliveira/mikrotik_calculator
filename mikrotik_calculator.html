@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>MikroTik Architect v5.7</title>
+    <title>MikroTik Architect v5.8</title>
     <meta name="description" content="Calculadora de dimensionamento de hardware MikroTik e gerador de script.">
     <style>
         :root {
@@ -160,9 +160,9 @@
         .pass-wrapper { position: relative; }
         .pass-toggle-btn {
             position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
-            cursor: pointer; opacity: 0.7; font-size: 1.1rem; user-select: none;
+            cursor: pointer; opacity: 0.7; font-size: 1.2rem; user-select: none;
         }
-        .pass-toggle-btn:hover { opacity: 1; color: var(--primary); }
+        .pass-toggle-btn:hover { opacity: 1; transform:translateY(-50%) scale(1.1); transition: 0.2s; }
 
         /* Custom Checkbox */
         .checkbox-item {
@@ -305,6 +305,33 @@
         .verdict.warn { background: rgba(245, 158, 11, 0.2); color: var(--warning); border: 1px solid rgba(245, 158, 11, 0.3); }
         .verdict.bad { background: rgba(239, 68, 68, 0.2); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.3); }
 
+        /* --- Dashboard --- */
+        .dashboard-container {
+            grid-column: 1 / -1;
+            margin-top: 20px;
+        }
+        
+        .dash-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 15px;
+        }
+
+        .dash-card {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .dash-icon { font-size: 1.5rem; margin-bottom: 10px; opacity: 0.8; }
+        .dash-title { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 5px; font-weight: 600; }
+        .dash-value { font-size: 1rem; font-weight: 600; color: var(--text-main); margin-bottom: 2px; }
+        .dash-sub { font-size: 0.75rem; color: var(--primary); }
+        .dash-sub.warn { color: var(--warning); }
+
         /* --- Mobile Sticky Footer --- */
         .mobile-footer {
             display: none;
@@ -410,7 +437,7 @@
     <!-- Header Area -->
     <header class="header">
         <div class="brand">
-            <h1>MikroTik Architect <span class="version-tag">v5.7</span></h1>
+            <h1>MikroTik Architect <span class="version-tag">v5.8</span></h1>
             <div style="font-size: 0.9rem; color: var(--text-muted);">Planejamento & Scripting (Full Management)</div>
         </div>
         <button class="btn btn-secondary btn-sm" onclick="openModal('advancedModal')">
@@ -481,6 +508,14 @@
                     <div class="form-group"><label>IP/Máscara</label><input type="text" id="staticIP" placeholder="Ex: 192.168.1.2/24"></div>
                     <div class="form-group"><label>Gateway</label><input type="text" id="staticGW" placeholder="Ex: 192.168.1.1"></div>
                 </div>
+            </div>
+        </div>
+
+        <!-- 3. Resumo Estatístico (Dashboard) -->
+        <div class="card dashboard-container">
+            <h2>📊 Resumo do Projeto</h2>
+            <div class="dash-grid" id="dashboard-grid">
+                <!-- Injected via JS -->
             </div>
         </div>
         
@@ -805,9 +840,9 @@
 
 <script>
 /**
- * MikroTik Architect v5.7
- * - Features: Auto LAN Pool, FastTrack Logic, Animated Meters, Upgrade Popup
- * - Changes: Decoupled Verdict Updates, Mobile Tooltip Fix, Password Toggle
+ * MikroTik Architect v5.8
+ * - Features: Auto LAN Pool, FastTrack Logic, Animated Meters, Upgrade Popup, Dashboard
+ * - Changes: New Dashboard Logic, 95% threshold, Icon Update
  */
 const App = (function() {
     
@@ -907,10 +942,10 @@ const App = (function() {
         if (input) {
             if (input.type === "password") {
                 input.type = "text";
-                btn.innerText = "🔒";
+                btn.innerText = "👁️";
             } else {
                 input.type = "password";
-                btn.innerText = "👁️";
+                btn.innerText = "🙈";
             }
         }
     }
@@ -918,7 +953,7 @@ const App = (function() {
     function handleScenarioChange() {
         const sc = getVal('scenario');
         const container = getEl('dynamicOptions');
-        if (!container) return; // safety
+        if (!container) return; 
 
         let html = '';
         
@@ -1043,7 +1078,6 @@ const App = (function() {
         setText('dhcp_info_txt', `~${count} IPs Disponíveis`);
     }
 
-    // New: Calculate pool from IP and CIDR
     function updateLanPool() {
         const ip = getVal('lanIp');
         const cidr = getInt('lanMask');
@@ -1053,10 +1087,8 @@ const App = (function() {
         const parts = ip.split('.');
         if (parts.length !== 4) return;
         
-        // Convert to long
         const ipLong = (parseInt(parts[0]) << 24) | (parseInt(parts[1]) << 16) | (parseInt(parts[2]) << 8) | parseInt(parts[3]);
         const maskLong = -1 << (32 - cidr);
-        
         const networkLong = ipLong & maskLong;
         const broadcastLong = networkLong | (~maskLong);
         
@@ -1064,7 +1096,7 @@ const App = (function() {
         const endLong = broadcastLong - 1;
 
         if (startLong < endLong) {
-            const startIp = long2ip(networkLong + 10); // Start at .10 convention
+            const startIp = long2ip(networkLong + 10); 
             const endIp = long2ip(endLong);
             const poolEl = getEl('lanPool');
             if (poolEl) poolEl.value = `${startIp}-${endIp}`;
@@ -1085,23 +1117,21 @@ const App = (function() {
         const users = getInt('users');
         const bw = getInt('bandwidth');
         
-        let effectiveBw = 0, ppsScore = 0, ruleScore = 0, ramUsage = 15; // Base RAM 15MB
+        let effectiveBw = 0, ppsScore = 0, ruleScore = 0, ramUsage = 15; 
         let userPlan = 0;
         let ppsFactor = appConfig.cpu_pps_factor;
         let isFastTrackPossible = true;
 
-        // 1. Bandwidth/PPS Base Logic
         if (scenario === 'hotspot') {
             if (isChecked('hs_no_queue')) {
                 userPlan = 20; 
-                ppsFactor *= 0.4; // Less CPU
+                ppsFactor *= 0.4;
             } else {
                 userPlan = (getInt('hsDl')||10) + (getInt('hsUl')||3);
                 ppsFactor *= 1.2;
-                isFastTrackPossible = false; // Queues disable fasttrack
+                isFastTrackPossible = false;
             }
             
-            // WiFeed DHCP Weight logic
             const leaseMins = getInt('hs_lease_time');
             const netSize = getInt('hs_net_size');
             if (leaseMins > 0) {
@@ -1120,19 +1150,17 @@ const App = (function() {
             } else { 
                 userPlan = 3; 
             }
-        } else { // Domestic
+        } else { 
             userPlan = 5; 
         }
 
-        // LAN DHCP Weight Logic
         const lanLease = getInt('lanLeaseTime');
         const lanCidr = getInt('lanMask');
         if (lanLease > 0) ruleScore += (0.5 * (60/lanLease)); 
         if (lanCidr > 0) ramUsage += (Math.pow(2, (32-lanCidr)) / 1024) * 0.2;
 
-        // FastTrack Logic
         if (isFastTrackPossible) {
-            ppsFactor *= 0.4; // FastTrack saves ~60% CPU on forwarding
+            ppsFactor *= 0.4;
         }
 
         let potentialTraf = users * userPlan * appConfig.simultaneity;
@@ -1141,7 +1169,6 @@ const App = (function() {
         
         if (getVal('wanType') === 'pppoe') ppsScore *= 1.1;
 
-        // 2. Rules Logic
         if (scenario === 'corporate') {
             let filters = 0;
             if (isChecked('blk_social')) filters++;
@@ -1159,7 +1186,6 @@ const App = (function() {
             if (isChecked('svc_' + s.id)) ramUsage += 0.2;
         });
 
-        // 3. RAM Logic User Overhead
         if (scenario === 'hotspot') ramUsage += (users * 0.45);
         else ramUsage += (users * 0.15);
 
@@ -1167,12 +1193,79 @@ const App = (function() {
         let cpuPct = (totalCpu / model.cpu_score) * 100;
         let ramPct = (ramUsage / model.ram) * 100;
 
-        // 4. Update UI
         updateAllBars(cpuPct, ramPct, ramUsage, model.ram, totalCpu, model.cpu_score);
         setText('hw-specs', `${model.arch} | CPU: ${model.cpu_score} | RAM: ${model.ram}MB | ${model.ports}`);
 
-        // 5. Upgrade Check
         checkUpgrade(totalCpu, ramUsage, modelKey);
+        updateDashboard(model, users, bw, userPlan);
+    }
+
+    function updateDashboard(model, users, bw, userPlan) {
+        const dash = getEl('dashboard-grid');
+        if (!dash) return;
+
+        const wanProto = getVal('wanType').toUpperCase();
+        const activeUsers = Math.round(users * appConfig.simultaneity);
+        const profileName = getEl('activeProfileLabel').innerText.replace('Perfil: ', '');
+        const lanCidr = getInt('lanMask');
+        const lanIps = Math.pow(2, 32 - lanCidr) - 2;
+        
+        // Calculate Overbooking
+        const demand = users * userPlan;
+        const overbooking = (demand / bw).toFixed(1);
+        const obClass = overbooking > 10 ? 'warn' : 'ok'; // Simplified visual check logic could be added
+
+        let html = `
+            <div class="dash-card">
+                <div class="dash-icon">🖥️</div>
+                <div class="dash-title">Equipamento</div>
+                <div class="dash-value">${model.name}</div>
+                <div class="dash-sub">CPU Score: ${model.cpu_score}</div>
+            </div>
+            <div class="dash-card">
+                <div class="dash-icon">🌍</div>
+                <div class="dash-title">Link Internet</div>
+                <div class="dash-value">${bw} Mbps</div>
+                <div class="dash-sub">${wanProto}</div>
+            </div>
+            <div class="dash-card">
+                <div class="dash-icon">👥</div>
+                <div class="dash-title">Usuários</div>
+                <div class="dash-value">${users} Total</div>
+                <div class="dash-sub">~${activeUsers} Ativos (${profileName})</div>
+            </div>
+            <div class="dash-card">
+                <div class="dash-icon">🔌</div>
+                <div class="dash-title">Rede LAN</div>
+                <div class="dash-value">/${lanCidr}</div>
+                <div class="dash-sub">${lanIps} IPs Úteis</div>
+            </div>
+            <div class="dash-card">
+                <div class="dash-icon">📊</div>
+                <div class="dash-title">Carga de Banda</div>
+                <div class="dash-value">${demand} Mbps</div>
+                <div class="dash-sub ${obClass}">Overbooking: ${overbooking}x</div>
+            </div>
+        `;
+
+        if (getVal('scenario') === 'hotspot') {
+            const hsCidr = getInt('hs_net_size');
+            const hsIps = Math.pow(2, 32 - hsCidr) - 2;
+            const hsUsage = Math.min((users / hsIps) * 100, 100);
+            
+            html += `
+            <div class="dash-card">
+                <div class="dash-icon">📡</div>
+                <div class="dash-title">Rede Hotspot</div>
+                <div class="dash-value">/${hsCidr}</div>
+                <div class="dash-sub">${hsIps} IPs (${Math.round(hsUsage)}% Ocupado)</div>
+                <div style="height:4px; background:#333; border-radius:2px; margin-top:5px; width:100%;">
+                    <div style="height:100%; width:${hsUsage}%; background:var(--accent); border-radius:2px;"></div>
+                </div>
+            </div>`;
+        }
+
+        dash.innerHTML = html;
     }
 
     function checkUpgrade(reqCpu, reqRam, currentKey) {
@@ -1182,7 +1275,7 @@ const App = (function() {
         const popup = getEl('upgrade-popup');
         const mobPopup = getEl('mob-upgrade-popup');
         
-        if (cpuP > 100 || ramP > 100) {
+        if (cpuP > 95 || ramP > 95) {
             let suggestion = null;
             for (let key of sortedHardwareKeys) {
                 let hw = hardwareDB[key];
@@ -1227,24 +1320,20 @@ const App = (function() {
     }
 
     function updateAllBars(cpu, ram, ramVal, ramMax, cpuVal, cpuMax) {
-        // Desktop Text
         setText('lbl-cpu', `${Math.round(cpu)}%`);
         setText('det-cpu', `${Math.round(cpuVal)} / ${cpuMax} pts`);
         updateBar('bar-cpu', '', cpu, 100);
 
-        // New RAM Text Format
         const ramFree = Math.max(0, ramMax - ramVal);
         setText('lbl-ram', `${Math.round(ramVal)}MB ${Math.round(ram)}%`);
         setText('det-ram', `${Math.round(ramFree)}MB Livres`);
         updateBar('bar-ram', '', ramVal, ramMax);
 
-        // Mobile / Modal Texts
         const cpuTxtMain = `${Math.round(cpu)}%`;
         const cpuTxtSub = `${Math.round(cpuVal)} / ${cpuMax} pts`;
         const ramTxtMain = `${Math.round(ramVal)}MB ${Math.round(ram)}%`;
         const ramTxtSub = `${Math.round(ramFree)}MB Livres`;
 
-        // Mobile
         updateBar('mob-bar-cpu', '', cpu, 100);
         setText('mob-lbl-cpu-main', cpuTxtMain);
         setText('mob-lbl-cpu-sub', cpuTxtSub);
@@ -1253,7 +1342,6 @@ const App = (function() {
         setText('mob-lbl-ram-main', ramTxtMain);
         setText('mob-lbl-ram-sub', ramTxtSub);
 
-        // Adv Modal
         updateBar('adv-bar-cpu', '', cpu, 100);
         setText('adv-lbl-cpu-main', cpuTxtMain);
         setText('adv-lbl-cpu-sub', cpuTxtSub);
@@ -1262,12 +1350,10 @@ const App = (function() {
         setText('adv-lbl-ram-main', ramTxtMain);
         setText('adv-lbl-ram-sub', ramTxtSub);
 
-        // Verdict Logic - Decoupled Updates for Stability
         const v = getEl('verdict-box');
         const vIcon = getEl('mob-verdict-icon');
         const vTool = getEl('mob-verdict-tooltip');
         
-        // Define State
         let stateClass = 'ok';
         let stateIcon = '✅';
         let stateText = 'ADEQUADO';
@@ -1279,7 +1365,6 @@ const App = (function() {
             stateClass = 'warn'; stateIcon = '⚠️'; stateText = 'ALERTA'; stateTool = 'Alerta';
         }
 
-        // Apply individually
         if (v) {
             v.innerText = `${stateIcon} ${stateText}`;
             v.className = `verdict ${stateClass}`;
@@ -1302,10 +1387,9 @@ const App = (function() {
         const lanPool = getVal('lanPool');
         const lanLease = getVal('lanLeaseTime');
         
-        // Convert Lease to Script Format
         const leaseStr = (lanLease >= 60) ? `${Math.floor(lanLease/60)}h` : `${lanLease}m`;
 
-        let s = `# Script Gerado pelo MikroTik Architect v5.7\n`;
+        let s = `# Script Gerado pelo MikroTik Architect v5.8\n`;
         s += `/system identity set name="${identity}"\n\n`;
 
         s += `# --- SERVIÇOS IP ---\n`;
@@ -1374,8 +1458,6 @@ const App = (function() {
         s += `/ip pool add name=dhcp_pool ranges=${lanPool}\n`;
         s += `/ip dhcp-server add name=dhcp1 interface=bridge-LAN address-pool=dhcp_pool disabled=no lease-time=${leaseStr}\n`;
         
-        // Network calc for script
-        // Simplified network calc using last octet .0
         const netBase = lanIp.substring(0, lanIp.lastIndexOf('.'));
         s += `/ip dhcp-server network add address=${netBase}.0/${lanCidr} gateway=${lanIp} dns-server=8.8.8.8,1.1.1.1\n`;
         s += `/ip firewall nat add action=masquerade chain=srcnat out-interface-list=WAN\n`;
@@ -1416,7 +1498,7 @@ const App = (function() {
                                 <input type="text" id="adminName" value="${getVal('adminName')}" style="margin-bottom:5px;">
                                 <div class="pass-wrapper">
                                     <input type="password" id="adminPass" value="${getVal('adminPass')}" style="padding-right: 30px;">
-                                    <span class="pass-toggle-btn" onclick="App.togglePass('adminPass', this)">👁️</span>
+                                    <span class="pass-toggle-btn" onclick="App.togglePass('adminPass', this)">🙈</span>
                                 </div>
                                 <small style="color:var(--success)">Admin Principal</small>
                             </div>`;
