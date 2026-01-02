@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>MikroTik Architect v6.1</title>
-    <meta name="description" content="Calculadora de dimensionamento de hardware MikroTik e gerador de script.">
+    <title>MikroTik Architect v7.1 (Final)</title>
+    <meta name="description" content="Calculadora de dimensionamento de hardware MikroTik e gerador de script com suporte a WiFeed.">
     <style>
         :root {
             /* Palette - Dark Cyberpunkish */
@@ -158,10 +158,52 @@
             text-align: center;
             background: rgba(59, 130, 246, 0.05);
             transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
         }
-        .file-upload-wrapper:hover { border-color: var(--primary); background: rgba(59, 130, 246, 0.1); }
-        .file-upload-label { cursor: pointer; color: var(--accent); font-weight: 600; display: block; width: 100%; }
+        .file-upload-wrapper.active { border-color: var(--success); background: rgba(16, 185, 129, 0.1); }
+        .file-upload-label { cursor: pointer; color: var(--accent); font-weight: 600; }
+        .file-remove-btn { 
+            background: var(--danger); color: white; border: none; 
+            border-radius: 50%; width: 24px; height: 24px; cursor: pointer; 
+            display: flex; align-items: center; justify-content: center;
+        }
         #wifFeedScriptUpload { display: none; }
+
+        /* WiFeed Editor */
+        .wifeed-editor {
+            background: rgba(0,0,0,0.2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            margin-top: 15px;
+            overflow: hidden;
+        }
+        .wifeed-editor-header {
+            padding: 10px 15px;
+            background: rgba(255,255,255,0.05);
+            cursor: pointer;
+            display: flex; justify-content: space-between; align-items: center;
+            font-weight: 600; font-size: 0.9rem;
+        }
+        .wifeed-editor-body { padding: 15px; }
+        .editor-row {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .editor-row:last-child { border-bottom: none; }
+        .editor-toggle {
+            cursor: pointer; font-size: 1.2rem; width: 30px; text-align: center;
+        }
+
+        /* Script Delta Badge */
+        .delta-badge {
+            display: inline-flex; align-items: center; gap: 5px;
+            padding: 4px 8px; border-radius: 4px; font-size: 0.8rem;
+            background: rgba(59, 130, 246, 0.15); color: var(--primary);
+            margin-top: 5px; border: 1px solid rgba(59, 130, 246, 0.3);
+        }
 
         /* Input with icon wrapper */
         .input-icon-wrapper { position: relative; }
@@ -282,16 +324,7 @@
             border-radius: 6px; 
             transition: width 0.5s ease-out; 
             background-size: 40px 40px;
-            background-image: linear-gradient(
-                45deg, 
-                rgba(255, 255, 255, 0.15) 25%, 
-                transparent 25%, 
-                transparent 50%, 
-                rgba(255, 255, 255, 0.15) 50%, 
-                rgba(255, 255, 255, 0.15) 75%, 
-                transparent 75%, 
-                transparent
-            );
+            background-image: linear-gradient(45deg, rgba(255, 255, 255, 0.15) 25%, transparent 25%, transparent 50%, rgba(255, 255, 255, 0.15) 50%, rgba(255, 255, 255, 0.15) 75%, transparent 75%, transparent);
         }
 
         .meter-fill.green { background-color: var(--success); animation: flow 2s linear infinite; }
@@ -354,6 +387,7 @@
         .dash-value { font-size: 0.95rem; font-weight: 700; color: var(--text-main); margin-bottom: 2px; word-break: break-word; }
         .dash-sub { font-size: 0.75rem; color: var(--primary); opacity: 0.8; }
         .dash-sub.warn { color: var(--warning); }
+        .dash-sub.ok { color: var(--success); }
 
         /* --- Mobile Sticky Footer --- */
         .mobile-footer {
@@ -466,7 +500,7 @@
     <!-- Header Area -->
     <header class="header">
         <div class="brand">
-            <h1>MikroTik Architect <span class="version-tag">v6.1</span></h1>
+            <h1>MikroTik Architect <span class="version-tag">v7.1</span></h1>
             <div style="font-size: 0.9rem; color: var(--text-muted);">Planejamento & Scripting (Full Management)</div>
         </div>
         <button class="btn btn-secondary btn-sm" onclick="openModal('advancedModal')">
@@ -546,7 +580,7 @@
             <div class="dash-grid" id="dashboard-grid"></div>
         </div>
 
-        <!-- 4. Resumo WiFeed (Dashboard) - Hidden by default -->
+        <!-- 4. Resumo WiFeed (Dashboard) -->
         <div class="card dashboard-container hidden" id="wifeed-dashboard">
             <h2>📡 Resumo Hotspot WiFeed</h2>
             <div class="dash-grid" id="wifeed-dash-grid"></div>
@@ -877,11 +911,6 @@
 </div>
 
 <script>
-/**
- * MikroTik Architect v6.1
- * - Features: Auto LAN Pool, FastTrack Logic, Animated Meters, Upgrade Popup, Dashboard
- * - New: WiFeed Script Parser & Dedicated Dashboard
- */
 window.App = (function() {
     
     // --- Data ---
@@ -891,7 +920,23 @@ window.App = (function() {
     let currentSuggestedModel = null;
     let sortedHardwareKeys = [];
     let scriptFontSize = 14;
-    let wifeedData = null; // Store parsed data
+    
+    // WiFeed Data State
+    let wifeedState = {
+        loaded: false,
+        fileName: '',
+        content: '',
+        parsed: {},
+        toggles: {
+            fixAuth: true,
+            dhcp: true,
+            storage: true,
+            interface: true,
+            scheduler: true,
+            walledGarden: true,
+            includeScript: false
+        }
+    };
 
     const ipServicesList = [
         {id: 'api', name: 'API', def: false, port: 8728},
@@ -917,55 +962,81 @@ window.App = (function() {
         'ccr1036': { name: 'CCR1036-8G-2S+', cpu_score: 28000, ram: 4096, arch: 'TILE', ports: '8x Giga + 2x SFP+' }
     };
 
-    // --- Private Methods ---
+    // --- Private Helpers ---
     function getEl(id) { return document.getElementById(id); }
     function getVal(id) { return getEl(id) ? getEl(id).value : ''; }
     function getInt(id) { return parseInt(getVal(id)) || 0; }
     function isChecked(id) { const el = getEl(id); return el ? el.checked : false; }
-
-    function setText(id, text) {
-        const el = getEl(id);
-        if (el) el.innerText = text;
-    }
-
+    function setText(id, text) { const el = getEl(id); if (el) el.innerText = text; }
+    
     function updateBar(elementId, labelId, current, max, suffix) {
         const pct = Math.min((current / max) * 100, 100);
         const el = getEl(elementId);
-        
         if (el) {
             el.style.width = `${pct}%`;
-            el.className = 'meter-fill'; // reset
+            el.className = 'meter-fill'; 
             if (pct < 60) el.classList.add('green');
             else if (pct < 85) el.classList.add('yellow');
             else el.classList.add('red');
         }
     }
 
-    // --- WiFeed Parser ---
+    // --- WiFeed Logic ---
     function parseWiFeedScript(content) {
         const result = {
             ipCidr: 24,
             interface: 'Unknown',
             ipRange: 'Unknown',
-            leaseTime: 60,
-            walledGardenCount: 0
+            leaseTime: 60, // mins
+            walledGardenCount: 0,
+            radiusIp: 'Unknown',
+            radiusPort: 'Unknown',
+            radiusAccept: 'Unknown',
+            gateway: 'Unknown',
+            requireMsgAuth: false,
+            storeLeases: '00:05:00',
+            schedulerInterval: '5m'
         };
 
         const cidrMatch = content.match(/#\s*ipCidr\s*-\s*\/(\d+)/);
-        if (cidrMatch && cidrMatch[1]) result.ipCidr = parseInt(cidrMatch[1]);
+        if (cidrMatch) result.ipCidr = parseInt(cidrMatch[1]);
 
         const ifaceMatch = content.match(/#\s*interfaceHotspot\s*-\s*(.+)/);
-        if (ifaceMatch && ifaceMatch[1]) result.interface = ifaceMatch[1].trim();
+        if (ifaceMatch) result.interface = ifaceMatch[1].trim();
 
         const rangeMatch = content.match(/#\s*ipRange\s*-\s*(.+)/);
-        if (rangeMatch && rangeMatch[1]) result.ipRange = rangeMatch[1].trim();
+        if (rangeMatch) result.ipRange = rangeMatch[1].trim();
+        
+        const ipMatch = content.match(/#\s*ipAddress\s*-\s*(.+)/);
+        if (ipMatch) result.gateway = ipMatch[1].trim();
 
+        // Lease Time
         const leaseMatch = content.match(/lease-time="?(\d+):(\d+):(\d+)"?/);
         if (leaseMatch) {
-            const h = parseInt(leaseMatch[1]);
-            const m = parseInt(leaseMatch[2]);
-            result.leaseTime = (h * 60) + m;
+            result.leaseTime = (parseInt(leaseMatch[1]) * 60) + parseInt(leaseMatch[2]);
         }
+
+        // Radius
+        const radIp = content.match(/#\s*radiusAddress\s*-\s*(.+)/);
+        if (radIp) result.radiusIp = radIp[1].trim();
+        
+        const radPort = content.match(/#\s*radiusAuthenticationPort\s*-\s*(.+)/);
+        if(radPort) result.radiusPort = radPort[1].trim();
+        
+        if (content.includes('/radius incoming\nset accept=yes')) result.radiusAccept = 'Yes';
+
+        // Check for require-message-auth=no
+        if (content.includes('require-message-auth=no')) {
+            result.requireMsgAuth = true; // Flag is present
+        }
+
+        // Store Leases
+        const storeMatch = content.match(/store-leases-disk="?([^"]+)"?/);
+        if(storeMatch) result.storeLeases = storeMatch[1];
+
+        // Scheduler
+        const schedMatch = content.match(/interval=(\d+\w+)/);
+        if(schedMatch) result.schedulerInterval = schedMatch[1];
 
         const wgMatches = content.match(/\/ip hotspot walled-garden ip/g);
         if (wgMatches) result.walledGardenCount = (content.match(/add action=accept/g) || []).length;
@@ -981,78 +1052,170 @@ window.App = (function() {
         reader.onload = function(e) {
             const content = e.target.result;
             if (content) {
-                wifeedData = parseWiFeedScript(content);
-                applyWiFeedConfig(wifeedData);
+                wifeedState.loaded = true;
+                wifeedState.fileName = file.name;
+                wifeedState.content = content;
+                wifeedState.parsed = parseWiFeedScript(content);
+                
+                // Set default toggle values based on script analysis
+                wifeedState.toggles.fixAuth = !wifeedState.parsed.requireMsgAuth; // If missing, enable fix
+                wifeedState.toggles.includeScript = true;
+
+                renderWiFeedEditor();
+                calculate();
+                
+                const dash = getEl('wifeed-dashboard');
+                if (dash) dash.classList.remove('hidden');
+                
+                getEl('wifFeedScriptUpload').value = ''; // Reset input
             }
         };
         reader.readAsText(file);
     }
 
-    function applyWiFeedConfig(data) {
-        const netSelect = getEl('hs_net_size');
-        if (netSelect) {
-            netSelect.value = data.ipCidr.toString();
-        }
-
-        const leaseSelect = getEl('hs_lease_time');
-        if (leaseSelect) {
-            let closest = 60;
-            let minDiff = Infinity;
-            Array.from(leaseSelect.options).forEach(opt => {
-                const val = parseInt(opt.value);
-                const diff = Math.abs(val - data.leaseTime);
-                if (diff < minDiff) {
-                    minDiff = diff;
-                    closest = val;
-                }
-            });
-            leaseSelect.value = closest.toString();
-        }
-
-        const dash = getEl('wifeed-dashboard');
-        if (dash) dash.classList.remove('hidden');
-
-        updateWiFeedDashboard(data);
-        updateDhcpInfo(); 
-        calculate(); 
+    function removeWiFeedFile() {
+        wifeedState.loaded = false;
+        wifeedState.fileName = '';
+        wifeedState.content = '';
+        wifeedState.parsed = {};
         
-        alert("Script analisado com sucesso! Parâmetros ajustados.");
+        const dash = getEl('wifeed-dashboard');
+        if (dash) dash.classList.add('hidden');
+        
+        renderWiFeedEditor();
+        calculate();
     }
 
-    function updateWiFeedDashboard(data) {
+    function toggleWiFeedOption(key) {
+        wifeedState.toggles[key] = !wifeedState.toggles[key];
+        renderWiFeedEditor();
+        calculate();
+    }
+
+    function renderWiFeedEditor() {
+        const container = getEl('wifeed-editor-container');
+        if (!container) return;
+
+        if (!wifeedState.loaded) {
+            container.innerHTML = `
+                <div class="file-upload-wrapper">
+                    <label for="wifFeedScriptUpload" class="file-upload-label">📂 Upload WiFeed Script (.rsc)</label>
+                    <input type="file" id="wifFeedScriptUpload" accept=".rsc,.txt">
+                </div>`;
+            getEl('wifFeedScriptUpload').addEventListener('change', handleFileUpload);
+            return;
+        }
+
+        // Render Loaded State
+        const p = wifeedState.parsed;
+        const t = wifeedState.toggles;
+        
+        // Calculate Delta Load
+        let cpuDelta = 0; let ramDelta = 0;
+        if(t.walledGarden) { ramDelta += (p.walledGardenCount * 0.1); cpuDelta += 2; }
+        if(t.scheduler) { cpuDelta += 1; }
+        if(t.fixAuth) { cpuDelta += 0.5; }
+        if(t.includeScript) { ramDelta += 5; } // Base script memory
+
+        const fixStatus = p.requireMsgAuth ? '✅ Já existe (no)' : '⚠️ Inexistente (Habilitar fix)';
+
+        let html = `
+        <div class="file-upload-wrapper active" style="justify-content:space-between; padding:10px;">
+            <div style="display:flex;align-items:center;gap:10px;">
+                <span>📄 ${wifeedState.fileName}</span>
+            </div>
+            <button class="file-remove-btn" onclick="App.removeWiFeedFile()">✕</button>
+        </div>
+
+        <div style="margin-bottom:15px; font-size:0.85rem; color:var(--text-muted);">
+            <strong>Carga Adicional Detectada:</strong><br>
+            CPU: +${cpuDelta.toFixed(1)} pts | RAM: +${ramDelta.toFixed(1)} MB
+            <div class="delta-badge">${fixStatus}</div>
+        </div>
+
+        <div class="checkbox-item" style="border:1px solid var(--accent); background:rgba(139,92,246,0.1);">
+            <input type="checkbox" ${t.includeScript ? 'checked' : ''} onchange="App.toggleWiFeedOption('includeScript')">
+            <label>Incluir Script WiFeed Completo ao Final</label>
+        </div>
+
+        ${t.includeScript ? `
+        <div class="wifeed-editor">
+            <div class="wifeed-editor-header">Editar Script WiFeed (Toggles)</div>
+            <div class="wifeed-editor-body">
+                <div class="editor-row">
+                    <span>Fix Require-Message-Auth (v6.49+/v7+)</span>
+                    <div class="editor-toggle" onclick="App.toggleWiFeedOption('fixAuth')">${t.fixAuth ? '✅' : '❌'}</div>
+                </div>
+                <div class="editor-row">
+                    <span>DHCP Server (Pool/Net/Lease)</span>
+                    <div class="editor-toggle" onclick="App.toggleWiFeedOption('dhcp')">${t.dhcp ? '✅' : '❌'}</div>
+                </div>
+                <div class="editor-row">
+                    <span>Tempo Store Leases Disk <span class="info-tip" title="Salvar leases no disco consome ciclos de escrita. Padrão 5m.">i</span></span>
+                    <div class="editor-toggle" onclick="App.toggleWiFeedOption('storage')">${t.storage ? '✅' : '❌'}</div>
+                </div>
+                <div class="editor-row">
+                    <span>Interface Hotspot (${p.interface})</span>
+                    <div class="editor-toggle" onclick="App.toggleWiFeedOption('interface')">${t.interface ? '✅' : '❌'}</div>
+                </div>
+                <div class="editor-row">
+                    <span>Agendador (Scheduler 5m)</span>
+                    <div class="editor-toggle" onclick="App.toggleWiFeedOption('scheduler')">${t.scheduler ? '✅' : '❌'}</div>
+                </div>
+                <div class="editor-row">
+                    <span>Walled Garden (${p.walledGardenCount} regras)</span>
+                    <div class="editor-toggle" onclick="App.toggleWiFeedOption('walledGarden')">${t.walledGarden ? '✅' : '❌'}</div>
+                </div>
+            </div>
+        </div>
+        ` : ''}
+        `;
+
+        container.innerHTML = html;
+        updateDashboardWiFeed(p);
+    }
+
+    function updateDashboardWiFeed(data) {
         const grid = getEl('wifeed-dash-grid');
         if (!grid) return;
 
         grid.innerHTML = `
             <div class="dash-card">
-                <div class="dash-icon">🔌</div>
-                <div class="dash-title">Interface Hotspot</div>
-                <div class="dash-value" style="font-size:0.8rem">${data.interface}</div>
+                <div class="dash-icon">📡</div>
+                <div class="dash-title">Radius Info</div>
+                <div class="dash-value" style="font-size:0.8rem">${data.radiusIp}:${data.radiusPort}</div>
+                <div class="dash-sub">Incoming: ${data.radiusAccept || 'No'}</div>
             </div>
             <div class="dash-card">
-                <div class="dash-icon">🌐</div>
-                <div class="dash-title">Rede / CIDR</div>
-                <div class="dash-value">/${data.ipCidr}</div>
-                <div class="dash-sub">Range: ${data.ipRange}</div>
+                <div class="dash-icon">🚪</div>
+                <div class="dash-title">Gateway Hotspot</div>
+                <div class="dash-value">${data.gateway}</div>
+                <div class="dash-sub">Interface: ${data.interface}</div>
             </div>
             <div class="dash-card">
-                <div class="dash-icon">⏱️</div>
-                <div class="dash-title">DHCP Lease Time</div>
-                <div class="dash-value">${Math.floor(data.leaseTime/60)}h ${data.leaseTime%60}m</div>
+                <div class="dash-icon">🔒</div>
+                <div class="dash-title">Auth Fix Status</div>
+                <div class="dash-value" style="font-size:0.8rem">${data.requireMsgAuth ? 'Script Nativo' : 'Requer Flag'}</div>
+                <div class="dash-sub ${data.requireMsgAuth ? 'ok' : 'warn'}">${data.requireMsgAuth ? 'Presente' : 'Ausente'}</div>
             </div>
             <div class="dash-card">
-                <div class="dash-icon">🛡️</div>
-                <div class="dash-title">Filtros Walled Garden</div>
-                <div class="dash-value">${data.walledGardenCount}</div>
-                <div class="dash-sub">Regras Detectadas</div>
+                <div class="dash-icon">💾</div>
+                <div class="dash-title">Lease Save Time</div>
+                <div class="dash-value">${data.storeLeases}</div>
+                <div class="dash-sub">Disk Write Interval</div>
+            </div>
+            <div class="dash-card">
+                <div class="dash-icon">⏲️</div>
+                <div class="dash-title">Agendador</div>
+                <div class="dash-value">${data.schedulerInterval}</div>
+                <div class="dash-sub">Update Interval</div>
             </div>
         `;
     }
 
-    // --- Public Interface ---
+    // --- Core Logic ---
     function init() {
         sortedHardwareKeys = Object.keys(hardwareDB).sort((a,b) => hardwareDB[a].cpu_score - hardwareDB[b].cpu_score);
-
         const sel = getEl('model');
         if (sel) {
             sortedHardwareKeys.forEach(key => {
@@ -1063,7 +1226,7 @@ window.App = (function() {
                 sel.appendChild(opt);
             });
         }
-
+        
         const svcContainer = getEl('ipServicesContainer');
         if (svcContainer) {
             ipServicesList.forEach(svc => {
@@ -1080,33 +1243,15 @@ window.App = (function() {
 
         if (getEl('cfg_simult')) getEl('cfg_simult').value = appConfig.simultaneity;
         if (getEl('cfg_cpu_pps')) getEl('cfg_cpu_pps').value = appConfig.cpu_pps_factor;
-
-        const fileInput = getEl('wifFeedScriptUpload');
-        if(fileInput) {
-            fileInput.addEventListener('change', handleFileUpload);
-        }
-
+        
         handleScenarioChange();
         calculate();
-    }
-
-    function togglePass(id, btn) {
-        const input = getEl(id);
-        if (input) {
-            if (input.type === "password") {
-                input.type = "text";
-                btn.innerText = "👁️";
-            } else {
-                input.type = "password";
-                btn.innerText = "🙈";
-            }
-        }
     }
 
     function handleScenarioChange() {
         const sc = getVal('scenario');
         const container = getEl('dynamicOptions');
-        if (!container) return; 
+        if (!container) return;
 
         if (sc !== 'hotspot') {
             const wd = getEl('wifeed-dashboard');
@@ -1114,20 +1259,17 @@ window.App = (function() {
         }
 
         let html = '';
-        
         if (sc === 'hotspot') {
             if(getEl('users')) getEl('users').value = 500;
             if(getEl('bandwidth')) getEl('bandwidth').value = 1000;
             if(getEl('usagePreset')) getEl('usagePreset').value = 'wifi';
             applyPreset(false);
 
+            // WiFeed Editor Container
+            html += `<div id="wifeed-editor-container" style="margin-bottom:15px;"></div>`;
+
             html += `
             <div style="padding:15px; background:rgba(255,255,255,0.05); border-radius:8px;">
-                <div class="file-upload-wrapper">
-                    <label for="wifFeedScriptUpload" class="file-upload-label">📂 Upload WiFeed Script para Análise (opcional)</label>
-                    <input type="file" id="wifFeedScriptUpload" accept=".rsc,.txt">
-                </div>
-
                 <div class="checkbox-item" style="margin-top:0; margin-bottom:10px;">
                     <input type="checkbox" id="hs_no_queue" onchange="App.toggleHsFields(); App.calculate()">
                     <label>Sem controle de banda (Pass-through)</label>
@@ -1139,144 +1281,38 @@ window.App = (function() {
                         <div class="input-icon-wrapper"><i>⬆️</i><input type="number" id="hsUl" value="3" placeholder="Up" oninput="App.calculate()"></div>
                     </div>
                 </div>
-                
-                <h5 style="margin:15px 0 5px 0; color:var(--text-muted); font-size:0.85rem;">Config DHCP WiFeed</h5>
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label>Tamanho da Rede</label>
-                        <select id="hs_net_size" onchange="App.updateDhcpInfo(); App.calculate()">
-                            <option value="24">/24 (254 IPs)</option>
-                            <option value="23">/23 (510 IPs)</option>
-                            <option value="22">/22 (1022 IPs)</option>
-                            <option value="21" selected>/21 (2046 IPs)</option>
-                            <option value="20">/20 (4094 IPs)</option>
-                            <option value="19">/19 (8190 IPs)</option>
-                            <option value="18">/18 (16382 IPs)</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Lease Time</label>
-                        <select id="hs_lease_time" onchange="App.calculate()">
-                            <option value="10">10 Minutos</option>
-                            <option value="30">30 Minutos</option>
-                            <option value="60" selected>1 Hora</option>
-                            <option value="120">2 Horas</option>
-                            <option value="180">3 Horas</option>
-                            <option value="360">6 Horas</option>
-                            <option value="720">12 Horas</option>
-                            <option value="1440">24 Horas</option>
-                        </select>
-                    </div>
+                <div class="form-group" style="margin-top:15px;">
+                    <label>Tamanho da Rede (Manual)</label>
+                    <select id="hs_net_size" onchange="App.calculate()">
+                        <option value="24">/24 (254 IPs)</option>
+                        <option value="23">/23 (510 IPs)</option>
+                        <option value="22">/22 (1022 IPs)</option>
+                        <option value="21" selected>/21 (2046 IPs)</option>
+                        <option value="20">/20 (4094 IPs)</option>
+                    </select>
                 </div>
-                <div id="dhcp_info_txt" style="font-size:0.75rem; color:var(--success);">~2046 IPs Disponíveis</div>
             </div>`;
         } else if (sc === 'corporate') {
-            if(getEl('users')) getEl('users').value = 250;
-            if(getEl('bandwidth')) getEl('bandwidth').value = 1000;
-            if(getEl('usagePreset')) getEl('usagePreset').value = 'heavy';
-            applyPreset(false);
-
-            html += `
-            <div style="background:rgba(137, 180, 250, 0.1); padding:15px; border-radius:8px; border:1px solid var(--primary-glow);">
+             if(getEl('users')) getEl('users').value = 250;
+             if(getEl('bandwidth')) getEl('bandwidth').value = 1000;
+             if(getEl('usagePreset')) getEl('usagePreset').value = 'heavy';
+             applyPreset(false);
+             html += `<div style="background:rgba(137, 180, 250, 0.1); padding:15px; border-radius:8px; border:1px solid var(--primary-glow);">
                 <h4 style="color:var(--primary); margin-top:0;">🛡️ Filtros Corporativos</h4>
                 <div class="checkbox-item"><input type="checkbox" id="blk_social" onchange="App.calculate()"><label>Bloquear Redes Sociais</label></div>
                 <div class="checkbox-item"><input type="checkbox" id="blk_adult" onchange="App.calculate()"><label>Bloquear Conteúdo Adulto</label></div>
                 <div class="checkbox-item"><input type="checkbox" id="blk_stream" onchange="App.calculate()"><label>Bloquear Streaming</label></div>
-            </div>
-            <div style="margin-top:15px;">
-                 <div class="checkbox-item"><input type="checkbox" id="corp_queues" onchange="App.calculate()"><label>Ativar Controle de Banda (Mbps)</label></div>
-                 <div id="corpSpeed" class="hidden form-grid" style="margin-top:10px;">
-                    <div class="input-icon-wrapper"><i>⬇️</i><input type="number" id="corpDl" value="10" oninput="App.calculate()"></div>
-                    <div class="input-icon-wrapper"><i>⬆️</i><input type="number" id="corpUl" value="5" oninput="App.calculate()"></div>
-                 </div>
             </div>`;
         } else {
-            if(getEl('users')) getEl('users').value = 50;
-            if(getEl('bandwidth')) getEl('bandwidth').value = 1000;
-            if(getEl('usagePreset')) getEl('usagePreset').value = 'standard';
-            applyPreset(false);
+             if(getEl('users')) getEl('users').value = 50;
+             if(getEl('bandwidth')) getEl('bandwidth').value = 1000;
+             if(getEl('usagePreset')) getEl('usagePreset').value = 'standard';
+             applyPreset(false);
         }
 
         container.innerHTML = html;
-        
-        if (sc === 'hotspot') {
-            setTimeout(() => {
-                const upl = getEl('wifFeedScriptUpload');
-                if (upl) upl.addEventListener('change', handleFileUpload);
-            }, 100);
-        }
-
-        if(getEl('corp_queues')) {
-            getEl('corp_queues').addEventListener('change', function() {
-                const spd = getEl('corpSpeed');
-                if (spd) spd.classList.toggle('hidden', !this.checked);
-                App.calculate();
-            });
-        }
+        if(sc === 'hotspot') renderWiFeedEditor();
         calculate();
-    }
-
-    function toggleHsFields() {
-        const noQueue = isChecked('hs_no_queue');
-        const f = getEl('hsSpeedFields');
-        if(f) f.classList.toggle('hidden', noQueue);
-    }
-    
-    function toggleWanFields() {
-        const type = getVal('wanType');
-        const ppp = getEl('pppoeFields');
-        const sta = getEl('staticFields');
-        if (ppp) ppp.classList.toggle('hidden', type !== 'pppoe');
-        if (sta) sta.classList.toggle('hidden', type !== 'static');
-        calculate();
-    }
-
-    function toggleToolField(id, force) {
-        let el = getEl(id);
-        if (!el) return;
-        if (force === undefined) { el.classList.toggle('hidden'); } 
-        else { el.classList.toggle('hidden', !force); }
-    }
-    
-    function toggleBkp() { 
-        const el = getEl('bkpFields');
-        if (el) el.classList.toggle('hidden', !isChecked('bkp_email')); 
-    }
-
-    function updateDhcpInfo() {
-        const size = getInt('hs_net_size');
-        const count = Math.pow(2, (32 - size)) - 2;
-        setText('dhcp_info_txt', `~${count} IPs Disponíveis`);
-    }
-
-    function updateLanPool() {
-        const ip = getVal('lanIp');
-        const cidr = getInt('lanMask');
-        
-        if (!ip || !cidr) return;
-        
-        const parts = ip.split('.');
-        if (parts.length !== 4) return;
-        
-        const ipLong = (parseInt(parts[0]) << 24) | (parseInt(parts[1]) << 16) | (parseInt(parts[2]) << 8) | parseInt(parts[3]);
-        const maskLong = -1 << (32 - cidr);
-        const networkLong = ipLong & maskLong;
-        const broadcastLong = networkLong | (~maskLong);
-        
-        const startLong = networkLong + 2; 
-        const endLong = broadcastLong - 1;
-
-        if (startLong < endLong) {
-            const startIp = long2ip(networkLong + 10); 
-            const endIp = long2ip(endLong);
-            const poolEl = getEl('lanPool');
-            if (poolEl) poolEl.value = `${startIp}-${endIp}`;
-        }
-        calculate();
-    }
-
-    function long2ip(ip) {
-        return ((ip >>> 24) + '.' + (ip >> 16 & 255) + '.' + (ip >> 8 & 255) + '.' + (ip & 255));
     }
 
     function calculate() {
@@ -1288,77 +1324,53 @@ window.App = (function() {
         const users = getInt('users');
         const bw = getInt('bandwidth');
         
-        let effectiveBw = 0, ppsScore = 0, ruleScore = 0, ramUsage = 15; 
+        let ppsScore = 0, ruleScore = 0, ramUsage = 15;
         let userPlan = 0;
         let ppsFactor = appConfig.cpu_pps_factor;
-        let isFastTrackPossible = true;
 
+        // Base Logic
         if (scenario === 'hotspot') {
-            if (isChecked('hs_no_queue')) {
-                userPlan = 20; 
-                ppsFactor *= 0.4;
-            } else {
-                userPlan = (getInt('hsDl')||10) + (getInt('hsUl')||3);
-                ppsFactor *= 1.2;
-                isFastTrackPossible = false;
-            }
+            if (isChecked('hs_no_queue')) { userPlan = 20; ppsFactor *= 0.4; } 
+            else { userPlan = (getInt('hsDl')||10) + (getInt('hsUl')||3); ppsFactor *= 1.2; }
+            ramUsage += (users * 0.45);
             
-            const leaseMins = getInt('hs_lease_time');
-            const netSize = getInt('hs_net_size');
-            if (leaseMins > 0) {
-                const leaseFactor = (60 / leaseMins); 
-                ruleScore += (users * 0.05 * leaseFactor);
-            }
-            if (netSize > 0) {
-                ramUsage += (Math.pow(2, (32-netSize)) / 1024) * 0.5;
+            // Network Size RAM impact
+            const netSize = getInt('hs_net_size') || 21;
+            ramUsage += (Math.pow(2, (32-netSize)) / 1024) * 0.5;
+
+            // WiFeed Specific Load
+            if (wifeedState.loaded && wifeedState.toggles.includeScript) {
+                const t = wifeedState.toggles;
+                const p = wifeedState.parsed;
+                
+                if(t.walledGarden) { ramUsage += (p.walledGardenCount * 0.1); ruleScore += 2; }
+                if(t.scheduler) ruleScore += 1;
+                if(t.fixAuth) ruleScore += 0.5;
+                if(t.dhcp) ramUsage += 2;
+                ramUsage += 5; // Base script overhead
             }
 
         } else if (scenario === 'corporate') {
-            if (isChecked('corp_queues')) {
-                userPlan = (getInt('corpDl')||10) + (getInt('corpUl')||5);
-                ppsFactor *= 1.5;
-                isFastTrackPossible = false;
-            } else { 
-                userPlan = 3; 
-            }
+            userPlan = 3;
+            if (isChecked('blk_social')) ruleScore += (users * 1.5);
+            if (isChecked('blk_adult')) ruleScore += (users * 1.5);
+            if (isChecked('blk_stream')) ruleScore += (users * 1.5);
+            ramUsage += (users * 0.15);
         } else { 
             userPlan = 5; 
+            ramUsage += (users * 0.15);
         }
 
-        const lanLease = getInt('lanLeaseTime');
-        const lanCidr = getInt('lanMask');
-        if (lanLease > 0) ruleScore += (0.5 * (60/lanLease)); 
-        if (lanCidr > 0) ramUsage += (Math.pow(2, (32-lanCidr)) / 1024) * 0.2;
-
-        if (isFastTrackPossible) {
-            ppsFactor *= 0.4;
-        }
-
-        let potentialTraf = users * userPlan * appConfig.simultaneity;
-        effectiveBw = Math.min(bw, potentialTraf);
-        ppsScore = effectiveBw * ppsFactor;
-        
-        if (getVal('wanType') === 'pppoe') ppsScore *= 1.1;
-
-        if (scenario === 'corporate') {
-            let filters = 0;
-            if (isChecked('blk_social')) filters++;
-            if (isChecked('blk_adult')) filters++;
-            if (isChecked('blk_stream')) filters++;
-            ruleScore += (users * filters * appConfig.fw_weight);
-        }
-        
+        // Standard Services
         if (isChecked('svc_snmp')) ruleScore += 5;
         if (isChecked('svc_tr069')) { ruleScore += 2; ramUsage += 2; }
         if (isChecked('svc_watchdog')) ruleScore += 0.5;
         ruleScore += (natRules.length * 2);
 
-        ipServicesList.forEach(s => {
-            if (isChecked('svc_' + s.id)) ramUsage += 0.2;
-        });
-
-        if (scenario === 'hotspot') ramUsage += (users * 0.45);
-        else ramUsage += (users * 0.15);
+        let potentialTraf = users * userPlan * appConfig.simultaneity;
+        let effectiveBw = Math.min(bw, potentialTraf);
+        ppsScore = effectiveBw * ppsFactor;
+        if (getVal('wanType') === 'pppoe') ppsScore *= 1.1;
 
         let totalCpu = ppsScore + ruleScore;
         let cpuPct = (totalCpu / model.cpu_score) * 100;
@@ -1366,223 +1378,11 @@ window.App = (function() {
 
         updateAllBars(cpuPct, ramPct, ramUsage, model.ram, totalCpu, model.cpu_score);
         setText('hw-specs', `${model.arch} | CPU: ${model.cpu_score} | RAM: ${model.ram}MB | ${model.ports}`);
-
         checkUpgrade(totalCpu, ramUsage, modelKey);
         updateDashboard(model, users, bw, userPlan);
     }
 
-    function updateDashboard(model, users, bw, userPlan) {
-        const dash = getEl('dashboard-grid');
-        if (!dash) return;
-
-        const wanProto = getVal('wanType').toUpperCase();
-        const activeUsers = Math.round(users * appConfig.simultaneity);
-        const profileName = getEl('activeProfileLabel').innerText.replace('Perfil: ', '');
-        const lanCidr = getInt('lanMask');
-        const lanIps = Math.pow(2, 32 - lanCidr) - 2;
-        
-        const demand = users * userPlan;
-        const overbooking = (demand / bw).toFixed(1);
-        const obClass = overbooking > 10 ? 'warn' : 'ok';
-
-        let bwControlHtml = '';
-        let dl = 0, ul = 0;
-        const sc = getVal('scenario');
-        if ((sc === 'hotspot' && !isChecked('hs_no_queue')) || (sc === 'corporate' && isChecked('corp_queues'))) {
-            if (sc === 'hotspot') { dl = getInt('hsDl'); ul = getInt('hsUl'); }
-            else { dl = getInt('corpDl'); ul = getInt('corpUl'); }
-            
-            bwControlHtml = `
-            <div class="dash-card">
-                <div class="dash-icon">🚀</div>
-                <div class="dash-title">Controle de Banda</div>
-                <div class="dash-value">${dl}M Down / ${ul}M Up</div>
-                <div class="dash-sub">Por Dispositivo</div>
-            </div>`;
-        }
-
-        let html = `
-            <div class="dash-card">
-                <div class="dash-icon">🖥️</div>
-                <div class="dash-title">Equipamento</div>
-                <div class="dash-value">${model.name}</div>
-                <div class="dash-sub">CPU Score: ${model.cpu_score}</div>
-            </div>
-            <div class="dash-card">
-                <div class="dash-icon">🌍</div>
-                <div class="dash-title">Link Internet</div>
-                <div class="dash-value">${bw} Mbps</div>
-                <div class="dash-sub">${wanProto}</div>
-            </div>
-            <div class="dash-card">
-                <div class="dash-icon">👥</div>
-                <div class="dash-title">Usuários</div>
-                <div class="dash-value">${users} Total</div>
-                <div class="dash-sub">~${activeUsers} Ativos (${profileName})</div>
-            </div>
-            <div class="dash-card">
-                <div class="dash-icon">🔌</div>
-                <div class="dash-title">Rede LAN</div>
-                <div class="dash-value">/${lanCidr}</div>
-                <div class="dash-sub">${lanIps} IPs Úteis</div>
-            </div>
-            ${bwControlHtml}
-            <div class="dash-card">
-                <div class="dash-icon">📊</div>
-                <div class="dash-title">Carga de Banda</div>
-                <div class="dash-value">${demand} Mbps</div>
-                <div class="dash-sub ${obClass}">Overbooking: ${overbooking}x</div>
-            </div>
-        `;
-
-        if (getVal('scenario') === 'hotspot') {
-            const hsCidr = getInt('hs_net_size');
-            const hsIps = Math.pow(2, 32 - hsCidr) - 2;
-            const hsUsage = Math.min((users / hsIps) * 100, 100);
-            
-            html += `
-            <div class="dash-card">
-                <div class="dash-icon">📡</div>
-                <div class="dash-title">Rede Hotspot</div>
-                <div class="dash-value">/${hsCidr}</div>
-                <div class="dash-sub">${hsIps} IPs (${Math.round(hsUsage)}% Ocupado)</div>
-                <div style="height:4px; background:#333; border-radius:2px; margin-top:5px; width:100%;">
-                    <div style="height:100%; width:${hsUsage}%; background:var(--accent); border-radius:2px;"></div>
-                </div>
-            </div>`;
-        }
-
-        dash.innerHTML = html;
-    }
-
-    function checkUpgrade(reqCpu, reqRam, currentKey) {
-        const cpuP = (reqCpu / hardwareDB[currentKey].cpu_score) * 100;
-        const ramP = (reqRam / hardwareDB[currentKey].ram) * 100;
-        
-        const popup = getEl('upgrade-popup');
-        const mobPopup = getEl('mob-upgrade-popup');
-        
-        if (cpuP > 95 || ramP > 95) {
-            let suggestion = null;
-            for (let key of sortedHardwareKeys) {
-                let hw = hardwareDB[key];
-                if (hw.cpu_score > reqCpu * 1.2 && hw.ram > reqRam * 1.2) {
-                    suggestion = key;
-                    break;
-                }
-            }
-            
-            if (suggestion) {
-                currentSuggestedModel = suggestion;
-                const txt = hardwareDB[suggestion].name;
-                setText('upgrade-msg-txt', txt);
-                setText('mob-upgrade-msg-txt', txt);
-                if(popup) popup.classList.remove('hidden');
-                if(mobPopup) mobPopup.style.display = 'flex';
-            } else {
-                currentSuggestedModel = null;
-                const txt = "Hardware TOP";
-                setText('upgrade-msg-txt', txt);
-                setText('mob-upgrade-msg-txt', txt);
-                if(popup) popup.classList.remove('hidden');
-                if(mobPopup) mobPopup.style.display = 'flex';
-            }
-        } else {
-            if(popup) popup.classList.add('hidden');
-            if(mobPopup) mobPopup.style.display = 'none';
-            currentSuggestedModel = null;
-        }
-    }
-
-    function upgradeModel() {
-        if (currentSuggestedModel) {
-            const el = getEl('model');
-            if(el) {
-                el.value = currentSuggestedModel;
-                calculate();
-            }
-        } else {
-            alert("Nenhum modelo superior encontrado na base de dados para esta carga.");
-        }
-    }
-
-    function updateAllBars(cpu, ram, ramVal, ramMax, cpuVal, cpuMax) {
-        setText('lbl-cpu', `${Math.round(cpu)}%`);
-        setText('det-cpu', `${Math.round(cpuVal)} / ${cpuMax} pts`);
-        updateBar('bar-cpu', '', cpu, 100);
-
-        const ramFree = Math.max(0, ramMax - ramVal);
-        setText('lbl-ram', `${Math.round(ramVal)}MB ${Math.round(ram)}%`);
-        setText('det-ram', `${Math.round(ramFree)}MB Livres`);
-        updateBar('bar-ram', '', ramVal, ramMax);
-
-        const cpuTxtMain = `${Math.round(cpu)}%`;
-        const cpuTxtSub = `${Math.round(cpuVal)} / ${cpuMax} pts`;
-        const ramTxtMain = `${Math.round(ramVal)}MB ${Math.round(ram)}%`;
-        const ramTxtSub = `${Math.round(ramFree)}MB Livres`;
-
-        updateBar('mob-bar-cpu', '', cpu, 100);
-        setText('mob-lbl-cpu-main', cpuTxtMain);
-        setText('mob-lbl-cpu-sub', cpuTxtSub);
-        
-        updateBar('mob-bar-ram', '', ramVal, ramMax);
-        setText('mob-lbl-ram-main', ramTxtMain);
-        setText('mob-lbl-ram-sub', ramTxtSub);
-
-        updateBar('adv-bar-cpu', '', cpu, 100);
-        setText('adv-lbl-cpu-main', cpuTxtMain);
-        setText('adv-lbl-cpu-sub', cpuTxtSub);
-        
-        updateBar('adv-bar-ram', '', ramVal, ramMax);
-        setText('adv-lbl-ram-main', ramTxtMain);
-        setText('adv-lbl-ram-sub', ramTxtSub);
-
-        const v = getEl('verdict-box');
-        const vIcon = getEl('mob-verdict-icon');
-        const vTool = getEl('mob-verdict-tooltip');
-        
-        let stateClass = 'ok';
-        let stateIcon = '✅';
-        let stateText = 'ADEQUADO';
-        let stateTool = 'Adequado';
-
-        if (ram > 95 || cpu > 95) { 
-            stateClass = 'bad'; stateIcon = '❌'; stateText = 'EXTRAPOLADO'; stateTool = 'Extrapolado';
-        } else if (ram > 80 || cpu > 80) { 
-            stateClass = 'warn'; stateIcon = '⚠️'; stateText = 'ALERTA'; stateTool = 'Alerta';
-        }
-
-        if (v) {
-            v.innerText = `${stateIcon} ${stateText}`;
-            v.className = `verdict ${stateClass}`;
-        }
-        if (vIcon) {
-            vIcon.innerText = stateIcon;
-        }
-        if (vTool) {
-            vTool.innerText = stateTool;
-        }
-    }
-
-    // --- Script Tools ---
-    function toggleWrap() {
-        const ta = getEl('finalScript');
-        if (ta) {
-            ta.style.whiteSpace = (ta.style.whiteSpace === 'pre') ? 'pre-wrap' : 'pre';
-        }
-    }
-
-    function zoomText(dir) {
-        const ta = getEl('finalScript');
-        if (ta) {
-            scriptFontSize += dir;
-            if (scriptFontSize < 10) scriptFontSize = 10;
-            if (scriptFontSize > 24) scriptFontSize = 24;
-            ta.style.fontSize = scriptFontSize + 'px';
-        }
-    }
-
-    // --- Script Generation ---
+    // --- Script Gen Update ---
     function generateScript() {
         const scenario = getVal('scenario');
         const identity = getVal('identityName');
@@ -1594,7 +1394,7 @@ window.App = (function() {
         
         const leaseStr = (lanLease >= 60) ? `${Math.floor(lanLease/60)}h` : `${lanLease}m`;
 
-        let s = `# Script Gerado pelo MikroTik Architect v6.1\n`;
+        let s = `# Script Gerado pelo MikroTik Architect v7.1\n`;
         s += `/system identity set name="${identity}"\n\n`;
 
         s += `# --- SERVIÇOS IP ---\n`;
@@ -1675,18 +1475,267 @@ window.App = (function() {
         if (scenario === 'corporate') {
             s += `\n# --- FILTROS ---\n`;
             if (isChecked('blk_social')) s += `/ip firewall filter add chain=forward protocol=tcp content="facebook.com" action=drop comment="Block Social"\n`;
-            if (isChecked('corp_queues')) {
-                let dl = getVal('corpDl');
-                let ul = getVal('corpUl');
-                s += `/queue simple add name="Limit_Users" target=${netBase}.0/${lanCidr} max-limit=${ul}M/${dl}M\n`;
+        }
+
+        // WiFeed Injection
+        if (getVal('scenario') === 'hotspot' && wifeedState.loaded && wifeedState.toggles.includeScript) {
+            s += `\n# ==========================================\n`;
+            s += `# WIFEED HOTSPOT CONFIGURATION\n`;
+            s += `# ==========================================\n`;
+            
+            let wf = wifeedState.content;
+            const t = wifeedState.toggles;
+
+            // Apply Fix Auth
+            if (t.fixAuth && !wifeedState.parsed.requireMsgAuth) {
+                // Regex replace to inject disabled=no require-message-auth=no
+                wf = wf.replace(/disabled=no secret=/g, 'disabled=no require-message-auth=no secret=');
             }
+
+            // Remove sections if toggled off
+            if (!t.scheduler) {
+                s += `# Scheduler skipped by user choice\n`;
+            }
+            if (!t.walledGarden) {
+                s += `# Walled Garden skipped\n`;
+            }
+            
+            s += wf;
         }
 
         getEl('finalScript').value = s;
         openModal('scriptModal');
     }
 
-    // --- Auxiliary Functions ---
+    // UI Helpers & Logic ported from v6
+    function updateDashboard(model, users, bw, userPlan) {
+        const dash = getEl('dashboard-grid');
+        if (!dash) return;
+
+        const wanProto = getVal('wanType').toUpperCase();
+        const activeUsers = Math.round(users * appConfig.simultaneity);
+        const profileName = getEl('activeProfileLabel').innerText.replace('Perfil: ', '');
+        const lanCidr = getInt('lanMask');
+        const lanIps = Math.pow(2, 32 - lanCidr) - 2;
+        
+        const demand = users * userPlan;
+        const overbooking = (demand / bw).toFixed(1);
+        const obClass = overbooking > 10 ? 'warn' : 'ok';
+
+        let html = `
+            <div class="dash-card">
+                <div class="dash-icon">🖥️</div>
+                <div class="dash-title">Equipamento</div>
+                <div class="dash-value">${model.name}</div>
+                <div class="dash-sub">CPU Score: ${model.cpu_score}</div>
+            </div>
+            <div class="dash-card">
+                <div class="dash-icon">🌍</div>
+                <div class="dash-title">Link Internet</div>
+                <div class="dash-value">${bw} Mbps</div>
+                <div class="dash-sub">${wanProto}</div>
+            </div>
+            <div class="dash-card">
+                <div class="dash-icon">👥</div>
+                <div class="dash-title">Usuários</div>
+                <div class="dash-value">${users} Total</div>
+                <div class="dash-sub">~${activeUsers} Ativos (${profileName})</div>
+            </div>
+            <div class="dash-card">
+                <div class="dash-icon">🔌</div>
+                <div class="dash-title">Rede LAN</div>
+                <div class="dash-value">/${lanCidr}</div>
+                <div class="dash-sub">${lanIps} IPs Úteis</div>
+            </div>
+            <div class="dash-card">
+                <div class="dash-icon">📊</div>
+                <div class="dash-title">Carga de Banda</div>
+                <div class="dash-value">${demand} Mbps</div>
+                <div class="dash-sub ${obClass}">Overbooking: ${overbooking}x</div>
+            </div>
+        `;
+        dash.innerHTML = html;
+    }
+
+    function checkUpgrade(reqCpu, reqRam, currentKey) {
+        const cpuP = (reqCpu / hardwareDB[currentKey].cpu_score) * 100;
+        const ramP = (reqRam / hardwareDB[currentKey].ram) * 100;
+        
+        const popup = getEl('upgrade-popup');
+        const mobPopup = getEl('mob-upgrade-popup');
+        
+        if (cpuP > 95 || ramP > 95) {
+            let suggestion = null;
+            for (let key of sortedHardwareKeys) {
+                let hw = hardwareDB[key];
+                if (hw.cpu_score > reqCpu * 1.2 && hw.ram > reqRam * 1.2) {
+                    suggestion = key;
+                    break;
+                }
+            }
+            
+            if (suggestion) {
+                currentSuggestedModel = suggestion;
+                const txt = hardwareDB[suggestion].name;
+                setText('upgrade-msg-txt', txt);
+                setText('mob-upgrade-msg-txt', txt);
+                if(popup) popup.classList.remove('hidden');
+                if(mobPopup) mobPopup.style.display = 'flex';
+            } else {
+                currentSuggestedModel = null;
+                const txt = "Hardware TOP";
+                setText('upgrade-msg-txt', txt);
+                setText('mob-upgrade-msg-txt', txt);
+                if(popup) popup.classList.remove('hidden');
+                if(mobPopup) mobPopup.style.display = 'flex';
+            }
+        } else {
+            if(popup) popup.classList.add('hidden');
+            if(mobPopup) mobPopup.style.display = 'none';
+            currentSuggestedModel = null;
+        }
+    }
+
+    function updateAllBars(cpu, ram, ramVal, ramMax, cpuVal, cpuMax) {
+        setText('lbl-cpu', `${Math.round(cpu)}%`);
+        setText('det-cpu', `${Math.round(cpuVal)} / ${cpuMax} pts`);
+        updateBar('bar-cpu', '', cpu, 100);
+
+        const ramFree = Math.max(0, ramMax - ramVal);
+        setText('lbl-ram', `${Math.round(ramVal)}MB ${Math.round(ram)}%`);
+        setText('det-ram', `${Math.round(ramFree)}MB Livres`);
+        updateBar('bar-ram', '', ramVal, ramMax);
+
+        const cpuTxtMain = `${Math.round(cpu)}%`;
+        const cpuTxtSub = `${Math.round(cpuVal)} / ${cpuMax} pts`;
+        const ramTxtMain = `${Math.round(ramVal)}MB ${Math.round(ram)}%`;
+        const ramTxtSub = `${Math.round(ramFree)}MB Livres`;
+
+        updateBar('mob-bar-cpu', '', cpu, 100);
+        setText('mob-lbl-cpu-main', cpuTxtMain);
+        setText('mob-lbl-cpu-sub', cpuTxtSub);
+        
+        updateBar('mob-bar-ram', '', ramVal, ramMax);
+        setText('mob-lbl-ram-main', ramTxtMain);
+        setText('mob-lbl-ram-sub', ramTxtSub);
+
+        updateBar('adv-bar-cpu', '', cpu, 100);
+        setText('adv-lbl-cpu-main', cpuTxtMain);
+        setText('adv-lbl-cpu-sub', cpuTxtSub);
+        
+        updateBar('adv-bar-ram', '', ramVal, ramMax);
+        setText('adv-lbl-ram-main', ramTxtMain);
+        setText('adv-lbl-ram-sub', ramTxtSub);
+
+        const v = getEl('verdict-box');
+        const vIcon = getEl('mob-verdict-icon');
+        const vTool = getEl('mob-verdict-tooltip');
+        
+        let stateClass = 'ok';
+        let stateIcon = '✅';
+        let stateText = 'ADEQUADO';
+        let stateTool = 'Adequado';
+
+        if (ram > 95 || cpu > 95) { 
+            stateClass = 'bad'; stateIcon = '❌'; stateText = 'EXTRAPOLADO'; stateTool = 'Extrapolado';
+        } else if (ram > 80 || cpu > 80) { 
+            stateClass = 'warn'; stateIcon = '⚠️'; stateText = 'ALERTA'; stateTool = 'Alerta';
+        }
+
+        if (v) {
+            v.innerText = `${stateIcon} ${stateText}`;
+            v.className = `verdict ${stateClass}`;
+        }
+        if (vIcon) {
+            vIcon.innerText = stateIcon;
+        }
+        if (vTool) {
+            vTool.innerText = stateTool;
+        }
+    }
+
+    function togglePass(id, btn) {
+        const input = getEl(id);
+        if (input) {
+            if (input.type === "password") {
+                input.type = "text";
+                btn.innerText = "👁️";
+            } else {
+                input.type = "password";
+                btn.innerText = "🙈";
+            }
+        }
+    }
+
+    function upgradeModel() {
+        if (currentSuggestedModel) {
+            const el = getEl('model');
+            if(el) {
+                el.value = currentSuggestedModel;
+                calculate();
+            }
+        } else {
+            alert("Nenhum modelo superior encontrado na base de dados para esta carga.");
+        }
+    }
+
+    function toggleHsFields() {
+        const noQueue = isChecked('hs_no_queue');
+        const f = getEl('hsSpeedFields');
+        if(f) f.classList.toggle('hidden', noQueue);
+    }
+    
+    function toggleWanFields() {
+        const type = getVal('wanType');
+        const ppp = getEl('pppoeFields');
+        const sta = getEl('staticFields');
+        if (ppp) ppp.classList.toggle('hidden', type !== 'pppoe');
+        if (sta) sta.classList.toggle('hidden', type !== 'static');
+        calculate();
+    }
+
+    function toggleToolField(id, force) {
+        let el = getEl(id);
+        if (!el) return;
+        if (force === undefined) { el.classList.toggle('hidden'); } 
+        else { el.classList.toggle('hidden', !force); }
+    }
+    
+    function toggleBkp() { 
+        const el = getEl('bkpFields');
+        if (el) el.classList.toggle('hidden', !isChecked('bkp_email')); 
+    }
+
+    function updateLanPool() {
+        const ip = getVal('lanIp');
+        const cidr = getInt('lanMask');
+        
+        if (!ip || !cidr) return;
+        
+        const parts = ip.split('.');
+        if (parts.length !== 4) return;
+        
+        const ipLong = (parseInt(parts[0]) << 24) | (parseInt(parts[1]) << 16) | (parseInt(parts[2]) << 8) | parseInt(parts[3]);
+        const maskLong = -1 << (32 - cidr);
+        const networkLong = ipLong & maskLong;
+        const broadcastLong = networkLong | (~maskLong);
+        
+        const startLong = networkLong + 2; 
+        const endLong = broadcastLong - 1;
+
+        if (startLong < endLong) {
+            const startIp = long2ip(networkLong + 10); 
+            const endIp = long2ip(endLong);
+            const poolEl = getEl('lanPool');
+            if (poolEl) poolEl.value = `${startIp}-${endIp}`;
+        }
+        calculate();
+    }
+
+    function long2ip(ip) {
+        return ((ip >>> 24) + '.' + (ip >> 16 & 255) + '.' + (ip >> 8 & 255) + '.' + (ip & 255));
+    }
+
     function addExtraUser() { 
         const name = prompt("Nome do Usuário:"); 
         const pass = prompt("Senha:"); 
@@ -1699,14 +1748,9 @@ window.App = (function() {
     function renderExtras() {
         const div = getEl('usersList');
         if (div) {
-            div.innerHTML = `<div style="background:rgba(255,255,255,0.05); padding:10px; border-radius:4px; margin-bottom:5px;">
-                                <input type="text" id="adminName" value="${getVal('adminName')}" style="margin-bottom:5px;">
-                                <div class="pass-wrapper">
-                                    <input type="password" id="adminPass" value="${getVal('adminPass')}" style="padding-right: 30px;">
-                                    <span class="pass-toggle-btn" onclick="App.togglePass('adminPass', this)">🙈</span>
-                                </div>
-                                <small style="color:var(--success)">Admin Principal</small>
-                            </div>`;
+            // Keep the admin block
+            const adminHtml = div.children[0].outerHTML;
+            div.innerHTML = adminHtml;
             extraUsers.forEach((u, idx) => {
                 const el = document.createElement('div');
                 el.style = "background:rgba(0,0,0,0.3); padding:8px; margin-top:5px; border-radius:4px; display:flex; justify-content:space-between; align-items:center;";
@@ -1781,6 +1825,23 @@ window.App = (function() {
             a.click();
         }
     }
+    
+    function toggleWrap() {
+        const ta = getEl('finalScript');
+        if (ta) {
+            ta.style.whiteSpace = (ta.style.whiteSpace === 'pre') ? 'pre-wrap' : 'pre';
+        }
+    }
+
+    function zoomText(dir) {
+        const ta = getEl('finalScript');
+        if (ta) {
+            scriptFontSize += dir;
+            if (scriptFontSize < 10) scriptFontSize = 10;
+            if (scriptFontSize > 24) scriptFontSize = 24;
+            ta.style.fontSize = scriptFontSize + 'px';
+        }
+    }
 
     // Exports
     return {
@@ -1788,29 +1849,15 @@ window.App = (function() {
         toggleToolField, toggleBkp, generateScript, updateLanPool,
         addExtraUser, removeUser, addNatRule, removeNat,
         applyPreset, updateConfig, copyToClipboard, downloadScript, 
-        updateDhcpInfo, upgradeModel, togglePass, toggleWrap, zoomText
+        upgradeModel, togglePass, toggleWrap, zoomText,
+        removeWiFeedFile, toggleWiFeedOption
     };
-
 })();
 
-window.openModal = (id) => { 
-    const el = document.getElementById(id);
-    if(el) {
-        el.style.display = 'flex'; 
-        setTimeout(() => el.classList.add('open'), 10); 
-        App.calculate(); 
-    }
-};
-window.closeModal = (id) => { 
-    const el = document.getElementById(id);
-    if(el) {
-        el.classList.remove('open'); 
-        setTimeout(() => el.style.display = 'none', 300); 
-    }
-};
-
+// Global Binding
+window.openModal = (id) => { const el = document.getElementById(id); if(el) { el.style.display = 'flex'; setTimeout(()=>el.classList.add('open'),10); App.calculate(); } };
+window.closeModal = (id) => { const el = document.getElementById(id); if(el) { el.classList.remove('open'); setTimeout(()=>el.style.display='none',300); } };
 document.addEventListener('DOMContentLoaded', App.init);
-
 </script>
 </body>
 </html>
