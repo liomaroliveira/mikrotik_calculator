@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>MikroTik Architect v7.4 (Final)</title>
+    <title>MikroTik Architect v7.5 (Final)</title>
     <meta name="description" content="Calculadora de dimensionamento de hardware MikroTik e gerador de script com suporte a WiFeed.">
     <style>
         :root {
@@ -560,7 +560,7 @@
     <!-- Header Area -->
     <header class="header">
         <div class="brand">
-            <h1>MikroTik Architect <span class="version-tag">v7.4</span></h1>
+            <h1>MikroTik Architect <span class="version-tag">v7.5</span></h1>
             <div style="font-size: 0.9rem; color: var(--text-muted);">Planejamento & Scripting (Full Management)</div>
         </div>
         <button class="btn btn-secondary btn-sm" onclick="openModal('advancedModal')">
@@ -996,6 +996,7 @@ window.App = (function() {
             dhcpGateway: '',
             dhcpPool: '',
             dhcpLease: '1h',
+            dhcpMask: '21', // Default mask for WiFeed is often /21
             storeLeaseTime: '00:05:00',
             interfaceName: '',
             schedulerInterval: '5m',
@@ -1078,6 +1079,19 @@ window.App = (function() {
         return options.map(o => `<option value="${o.v}" ${o.v === selectedValue ? 'selected' : ''}>${o.l}</option>`).join('');
     }
 
+    function getMaskOptionsHtml(selectedValue) {
+        const options = [
+            {v:'18', l:'/18 (16382 IPs)'},
+            {v:'19', l:'/19 (8190 IPs)'},
+            {v:'20', l:'/20 (4094 IPs)'},
+            {v:'21', l:'/21 (2046 IPs)'},
+            {v:'22', l:'/22 (1022 IPs)'},
+            {v:'23', l:'/23 (510 IPs)'},
+            {v:'24', l:'/24 (254 IPs)'}
+        ];
+        return options.map(o => `<option value="${o.v}" ${o.v === (selectedValue || '21') ? 'selected' : ''}>${o.l}</option>`).join('');
+    }
+
     function parseLeaseTime(str) {
         if (!str) return 60;
         let m = 0;
@@ -1095,7 +1109,7 @@ window.App = (function() {
     // --- WiFeed Logic ---
     function parseWiFeedScript(content) {
         const result = {
-            ipCidr: 24,
+            ipCidr: 21, // Default fallback
             interface: 'Unknown',
             ipRange: 'Unknown',
             leaseTime: '1h',
@@ -1192,6 +1206,7 @@ window.App = (function() {
                 wifeedState.config.dhcpGateway = p.gateway;
                 wifeedState.config.dhcpPool = p.ipRange;
                 wifeedState.config.dhcpLease = p.leaseTime;
+                wifeedState.config.dhcpMask = p.ipCidr.toString(); // Store mask
                 wifeedState.config.storeLeaseTime = p.storeLeases;
                 wifeedState.config.interfaceName = p.interface;
                 wifeedState.config.schedulerInterval = p.schedulerInterval;
@@ -1243,6 +1258,35 @@ window.App = (function() {
 
     function updateWiFeedConfig(key, value) {
         wifeedState.config[key] = value;
+        calculate();
+    }
+
+    function recalcWiFeedPool(mask) {
+        wifeedState.config.dhcpMask = mask;
+        const cidr = parseInt(mask);
+        const ip = wifeedState.config.dhcpGateway;
+        
+        if(!ip || !cidr) return;
+        const p = ip.split('.'); if(p.length!=4) return;
+        
+        // Correct Bitwise Logic
+        const ipLong = ((parseInt(p[0]) << 24) | (parseInt(p[1]) << 16) | (parseInt(p[2]) << 8) | parseInt(p[3])) >>> 0;
+        const maskLong = (-1 << (32 - cidr)) >>> 0;
+        const networkLong = (ipLong & maskLong) >>> 0;
+        const broadcastLong = (networkLong | (~maskLong >>> 0)) >>> 0;
+        
+        // Start .2 to End .254 (assuming gateway is .1, usually)
+        // If gw is part of subnet, we should exclude it, but for simplicity:
+        // Start: Network + 2
+        // End: Broadcast - 1
+        const startIp = long2ip((networkLong + 2) >>> 0); 
+        const endIp = long2ip((broadcastLong - 1) >>> 0);
+        
+        const newPool = `${startIp}-${endIp}`;
+        wifeedState.config.dhcpPool = newPool;
+        
+        // Re-render to update the input field
+        renderWiFeedEditor();
         calculate();
     }
 
@@ -1364,6 +1408,12 @@ window.App = (function() {
                             <div><label style="font-size:0.75rem">Gateway IP</label><input type="text" value="${c.dhcpGateway}" oninput="App.updateWiFeedConfig('dhcpGateway', this.value)"></div>
                             <div><label style="font-size:0.75rem">Pool Range</label><input type="text" value="${c.dhcpPool}" oninput="App.updateWiFeedConfig('dhcpPool', this.value)"></div>
                             <div><label style="font-size:0.75rem">Lease Time</label><select onchange="App.updateWiFeedConfig('dhcpLease', this.value)">${getLeaseOptionsHtml(c.dhcpLease)}</select></div>
+                        </div>
+                        <div style="margin-top:10px; display:flex; gap:10px; align-items:center;">
+                            <label style="font-size:0.75rem; margin:0;">Recalcular Pool (Mask):</label>
+                            <select style="width:auto; padding:5px;" onchange="App.recalcWiFeedPool(this.value)">
+                                ${getMaskOptionsHtml(c.dhcpMask)}
+                            </select>
                         </div>
                     </div>` : ''}
                 </div>
@@ -1547,7 +1597,9 @@ window.App = (function() {
         if (sc === 'hotspot') {
             if(getEl('users')) getEl('users').value = 500;
             if(getEl('bandwidth')) getEl('bandwidth').value = 1000;
-            if(getEl('usagePreset')) getEl('usagePreset').value = 'wifi';
+            
+            // Restore Auto-Profile selection
+            getEl('usagePreset').value = 'wifi';
             applyPreset(false);
 
             html += `<div id="wifeed-editor-container" style="margin-bottom:15px;"></div>`;
@@ -1590,8 +1642,11 @@ window.App = (function() {
         } else if (sc === 'corporate') {
              if(getEl('users')) getEl('users').value = 250;
              if(getEl('bandwidth')) getEl('bandwidth').value = 1000;
-             if(getEl('usagePreset')) getEl('usagePreset').value = 'heavy';
+             
+             // Restore Auto-Profile selection
+             getEl('usagePreset').value = 'heavy';
              applyPreset(false);
+
              html += `<div style="background:rgba(137, 180, 250, 0.1); padding:15px; border-radius:8px; border:1px solid var(--primary-glow);">
                 <h4 style="color:var(--primary); margin-top:0;">🛡️ Filtros Corporativos</h4>
                 <div class="checkbox-item"><input type="checkbox" id="blk_social" onchange="App.calculate()"><label>Bloquear Redes Sociais</label></div>
@@ -1601,7 +1656,9 @@ window.App = (function() {
         } else {
              if(getEl('users')) getEl('users').value = 50;
              if(getEl('bandwidth')) getEl('bandwidth').value = 1000;
-             if(getEl('usagePreset')) getEl('usagePreset').value = 'standard';
+             
+             // Restore Auto-Profile selection
+             getEl('usagePreset').value = 'standard';
              applyPreset(false);
         }
 
@@ -1681,7 +1738,10 @@ window.App = (function() {
 
         updateAllBars(cpuPct, ramPct, ramUsage, model.ram, totalCpu, model.cpu_score);
         setText('hw-specs', `${model.arch} | CPU: ${model.cpu_score} | RAM: ${model.ram}MB | ${model.ports}`);
+        
+        // Pass CALCULATED load, not model capacity, to upgrade checker
         checkUpgrade(totalCpu, ramUsage, modelKey);
+        
         updateDashboard(model, users, bw, userPlan);
     }
 
@@ -1694,7 +1754,7 @@ window.App = (function() {
         const lanLease = getVal('lanLeaseTime');
         const leaseStr = (lanLease >= 60) ? `${Math.floor(lanLease/60)}h` : `${lanLease}m`;
 
-        let s = `# Script Gerado pelo MikroTik Architect v7.3\n`;
+        let s = `# Script Gerado pelo MikroTik Architect v7.5\n`;
         s += `/system identity set name="${identity}"\n\n`;
 
         s += `# --- SERVIÇOS IP ---\n`;
@@ -1894,21 +1954,46 @@ window.App = (function() {
         const popup = getEl('upgrade-popup');
         const mobPopup = getEl('mob-upgrade-popup');
         const model = hardwareDB[currentKey];
+        
+        // Check if CURRENT selection is overwhelmed
         if(reqCpu > model.cpu_score * 0.95 || reqRam > model.ram * 0.95) {
+            
+            // LOGIC FIX: Find the first model that is strictly better than current load requirements
+            // and is NOT the same as the current selection (unless current is top already)
             let sug = null;
-            for(let k of sortedHardwareKeys) if(hardwareDB[k].cpu_score > reqCpu*1.2) { sug=k; break; }
             
-            // --- FIX START ---
-            // Update global state for click handler
-            currentSuggestedModel = sug; 
-            // --- FIX END ---
-
-            const txt = sug ? hardwareDB[sug].name : "Upgrade Needed";
-            setText('upgrade-msg-txt', txt);
-            setText('mob-upgrade-msg-txt', txt);
+            // Loop through hardware sorted by score
+            for(let k of sortedHardwareKeys) {
+                let hw = hardwareDB[k];
+                // Check if this HW meets requirement with 20% headroom
+                if(hw.cpu_score > reqCpu * 1.2 && hw.ram > reqRam * 1.2) {
+                    sug = k;
+                    // If we found a suitable candidate, stop looking.
+                    // This ensures we pick the "next best", not the most expensive.
+                    break; 
+                }
+            }
             
-            if(popup) popup.classList.remove('hidden');
-            if(mobPopup) mobPopup.style.display = 'flex';
+            // Logic to prevent suggesting the same model if it's the only one found?
+            // Since we sort by score, if the current model is weak, the loop will find a stronger one.
+            // If the loop returns the current key, it means even the current model isn't enough but nothing smaller is either.
+            // However, sortedHardwareKeys includes currentKey. If currentKey is not enough, the loop will skip it?
+            // Actually, the loop condition checks against reqCpu. If current model < reqCpu, it won't be picked.
+            
+            if (sug) {
+                currentSuggestedModel = sug; // Update global state
+                const txt = hardwareDB[sug].name;
+                setText('upgrade-msg-txt', txt);
+                setText('mob-upgrade-msg-txt', txt);
+                if(popup) popup.classList.remove('hidden');
+                if(mobPopup) mobPopup.style.display = 'flex';
+            } else {
+                // No better hardware found in DB
+                setText('upgrade-msg-txt', "Hardware TOP");
+                setText('mob-upgrade-msg-txt', "Hardware TOP");
+                if(popup) popup.classList.remove('hidden');
+                if(mobPopup) mobPopup.style.display = 'flex';
+            }
         } else {
             if(popup) popup.classList.add('hidden');
             if(mobPopup) mobPopup.style.display = 'none';
@@ -2008,7 +2093,7 @@ window.App = (function() {
     }
     function removeNat(idx) { natRules.splice(idx, 1); renderNat(); calculate(); }
     function applyPreset(fs) { 
-        const p = getVal('usagePreset'); // Fixed typo from 'getVal' to correct logic
+        const p = getVal('usagePreset'); 
         if(p==='wifi') { appConfig.simultaneity=0.5; appConfig.cpu_pps_factor=0.45; }
         else if(p==='cabled') { appConfig.simultaneity=0.7; appConfig.cpu_pps_factor=0.25; }
         else if(p==='heavy') { appConfig.simultaneity=0.9; appConfig.cpu_pps_factor=0.5; }
@@ -2035,7 +2120,7 @@ window.App = (function() {
         applyPreset, updateConfig, copyToClipboard, downloadScript, 
         upgradeModel, togglePass, toggleWrap, zoomText, toggleTooltip,
         removeWiFeedFile, toggleWiFeedOption, toggleWiFeedBody, updateWiFeedConfig, 
-        toggleAllWG, toggleWGRule, toggleAllFW, toggleFWRule
+        toggleAllWG, toggleWGRule, toggleAllFW, toggleFWRule, recalcWiFeedPool
     };
 })();
 
