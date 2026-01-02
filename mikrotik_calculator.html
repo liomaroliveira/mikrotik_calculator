@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>MikroTik Architect v5.9</title>
+    <title>MikroTik Architect v6.1</title>
     <meta name="description" content="Calculadora de dimensionamento de hardware MikroTik e gerador de script.">
     <style>
         :root {
@@ -148,6 +148,21 @@
             box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
         }
 
+        /* File Upload Styled */
+        .file-upload-wrapper {
+            position: relative;
+            margin-bottom: 15px;
+            border: 2px dashed var(--border);
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+            background: rgba(59, 130, 246, 0.05);
+            transition: all 0.3s;
+        }
+        .file-upload-wrapper:hover { border-color: var(--primary); background: rgba(59, 130, 246, 0.1); }
+        .file-upload-label { cursor: pointer; color: var(--accent); font-weight: 600; display: block; width: 100%; }
+        #wifFeedScriptUpload { display: none; }
+
         /* Input with icon wrapper */
         .input-icon-wrapper { position: relative; }
         .input-icon-wrapper i {
@@ -266,7 +281,7 @@
             height: 100%; 
             border-radius: 6px; 
             transition: width 0.5s ease-out; 
-            background-size: 40px 40px; /* Increased size for visibility */
+            background-size: 40px 40px;
             background-image: linear-gradient(
                 45deg, 
                 rgba(255, 255, 255, 0.15) 25%, 
@@ -313,7 +328,7 @@
         
         .dash-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); /* Adjusted for mobile stacking logic */
+            grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
             gap: 15px;
         }
 
@@ -324,7 +339,7 @@
             padding: 15px;
             display: flex;
             flex-direction: column;
-            box-shadow: 0 0 15px rgba(59, 130, 246, 0.08); /* Glow added */
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.08);
             transition: transform 0.2s, box-shadow 0.2s;
         }
         
@@ -451,7 +466,7 @@
     <!-- Header Area -->
     <header class="header">
         <div class="brand">
-            <h1>MikroTik Architect <span class="version-tag">v5.9</span></h1>
+            <h1>MikroTik Architect <span class="version-tag">v6.1</span></h1>
             <div style="font-size: 0.9rem; color: var(--text-muted);">Planejamento & Scripting (Full Management)</div>
         </div>
         <button class="btn btn-secondary btn-sm" onclick="openModal('advancedModal')">
@@ -525,12 +540,16 @@
             </div>
         </div>
 
-        <!-- 3. Resumo Estatístico (Dashboard) -->
+        <!-- 3. Resumo Geral (Dashboard) -->
         <div class="card dashboard-container">
-            <h2>📊 Resumo do Projeto</h2>
-            <div class="dash-grid" id="dashboard-grid">
-                <!-- Injected via JS -->
-            </div>
+            <h2>📊 Resumo Geral</h2>
+            <div class="dash-grid" id="dashboard-grid"></div>
+        </div>
+
+        <!-- 4. Resumo WiFeed (Dashboard) - Hidden by default -->
+        <div class="card dashboard-container hidden" id="wifeed-dashboard">
+            <h2>📡 Resumo Hotspot WiFeed</h2>
+            <div class="dash-grid" id="wifeed-dash-grid"></div>
         </div>
         
         <div class="mobile-only" style="margin-bottom: 30px;"></div>
@@ -663,7 +682,7 @@
                             <input type="text" id="adminName" value="liomar" placeholder="User" style="margin-bottom:5px;">
                             <div class="pass-wrapper">
                                 <input type="password" id="adminPass" value="Mudar@123" placeholder="Pass" style="padding-right: 30px;">
-                                <span class="pass-toggle-btn" onclick="App.togglePass('adminPass', this)">👁️</span>
+                                <span class="pass-toggle-btn" onclick="App.togglePass('adminPass', this)">🙈</span>
                             </div>
                             <small style="color:var(--success); display:block; margin-top:4px;">Admin Principal</small>
                         </div>
@@ -859,11 +878,11 @@
 
 <script>
 /**
- * MikroTik Architect v5.9
+ * MikroTik Architect v6.1
  * - Features: Auto LAN Pool, FastTrack Logic, Animated Meters, Upgrade Popup, Dashboard
- * - Changes: New Dashboard Logic, 95% threshold, Icon Update, Glow Effects, Script Tools
+ * - New: WiFeed Script Parser & Dedicated Dashboard
  */
-const App = (function() {
+window.App = (function() {
     
     // --- Data ---
     let extraUsers = [];
@@ -872,6 +891,7 @@ const App = (function() {
     let currentSuggestedModel = null;
     let sortedHardwareKeys = [];
     let scriptFontSize = 14;
+    let wifeedData = null; // Store parsed data
 
     const ipServicesList = [
         {id: 'api', name: 'API', def: false, port: 8728},
@@ -921,6 +941,114 @@ const App = (function() {
         }
     }
 
+    // --- WiFeed Parser ---
+    function parseWiFeedScript(content) {
+        const result = {
+            ipCidr: 24,
+            interface: 'Unknown',
+            ipRange: 'Unknown',
+            leaseTime: 60,
+            walledGardenCount: 0
+        };
+
+        const cidrMatch = content.match(/#\s*ipCidr\s*-\s*\/(\d+)/);
+        if (cidrMatch && cidrMatch[1]) result.ipCidr = parseInt(cidrMatch[1]);
+
+        const ifaceMatch = content.match(/#\s*interfaceHotspot\s*-\s*(.+)/);
+        if (ifaceMatch && ifaceMatch[1]) result.interface = ifaceMatch[1].trim();
+
+        const rangeMatch = content.match(/#\s*ipRange\s*-\s*(.+)/);
+        if (rangeMatch && rangeMatch[1]) result.ipRange = rangeMatch[1].trim();
+
+        const leaseMatch = content.match(/lease-time="?(\d+):(\d+):(\d+)"?/);
+        if (leaseMatch) {
+            const h = parseInt(leaseMatch[1]);
+            const m = parseInt(leaseMatch[2]);
+            result.leaseTime = (h * 60) + m;
+        }
+
+        const wgMatches = content.match(/\/ip hotspot walled-garden ip/g);
+        if (wgMatches) result.walledGardenCount = (content.match(/add action=accept/g) || []).length;
+
+        return result;
+    }
+
+    function handleFileUpload(evt) {
+        const file = evt.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const content = e.target.result;
+            if (content) {
+                wifeedData = parseWiFeedScript(content);
+                applyWiFeedConfig(wifeedData);
+            }
+        };
+        reader.readAsText(file);
+    }
+
+    function applyWiFeedConfig(data) {
+        const netSelect = getEl('hs_net_size');
+        if (netSelect) {
+            netSelect.value = data.ipCidr.toString();
+        }
+
+        const leaseSelect = getEl('hs_lease_time');
+        if (leaseSelect) {
+            let closest = 60;
+            let minDiff = Infinity;
+            Array.from(leaseSelect.options).forEach(opt => {
+                const val = parseInt(opt.value);
+                const diff = Math.abs(val - data.leaseTime);
+                if (diff < minDiff) {
+                    minDiff = diff;
+                    closest = val;
+                }
+            });
+            leaseSelect.value = closest.toString();
+        }
+
+        const dash = getEl('wifeed-dashboard');
+        if (dash) dash.classList.remove('hidden');
+
+        updateWiFeedDashboard(data);
+        updateDhcpInfo(); 
+        calculate(); 
+        
+        alert("Script analisado com sucesso! Parâmetros ajustados.");
+    }
+
+    function updateWiFeedDashboard(data) {
+        const grid = getEl('wifeed-dash-grid');
+        if (!grid) return;
+
+        grid.innerHTML = `
+            <div class="dash-card">
+                <div class="dash-icon">🔌</div>
+                <div class="dash-title">Interface Hotspot</div>
+                <div class="dash-value" style="font-size:0.8rem">${data.interface}</div>
+            </div>
+            <div class="dash-card">
+                <div class="dash-icon">🌐</div>
+                <div class="dash-title">Rede / CIDR</div>
+                <div class="dash-value">/${data.ipCidr}</div>
+                <div class="dash-sub">Range: ${data.ipRange}</div>
+            </div>
+            <div class="dash-card">
+                <div class="dash-icon">⏱️</div>
+                <div class="dash-title">DHCP Lease Time</div>
+                <div class="dash-value">${Math.floor(data.leaseTime/60)}h ${data.leaseTime%60}m</div>
+            </div>
+            <div class="dash-card">
+                <div class="dash-icon">🛡️</div>
+                <div class="dash-title">Filtros Walled Garden</div>
+                <div class="dash-value">${data.walledGardenCount}</div>
+                <div class="dash-sub">Regras Detectadas</div>
+            </div>
+        `;
+    }
+
     // --- Public Interface ---
     function init() {
         sortedHardwareKeys = Object.keys(hardwareDB).sort((a,b) => hardwareDB[a].cpu_score - hardwareDB[b].cpu_score);
@@ -953,6 +1081,11 @@ const App = (function() {
         if (getEl('cfg_simult')) getEl('cfg_simult').value = appConfig.simultaneity;
         if (getEl('cfg_cpu_pps')) getEl('cfg_cpu_pps').value = appConfig.cpu_pps_factor;
 
+        const fileInput = getEl('wifFeedScriptUpload');
+        if(fileInput) {
+            fileInput.addEventListener('change', handleFileUpload);
+        }
+
         handleScenarioChange();
         calculate();
     }
@@ -975,16 +1108,26 @@ const App = (function() {
         const container = getEl('dynamicOptions');
         if (!container) return; 
 
+        if (sc !== 'hotspot') {
+            const wd = getEl('wifeed-dashboard');
+            if (wd) wd.classList.add('hidden');
+        }
+
         let html = '';
         
         if (sc === 'hotspot') {
             if(getEl('users')) getEl('users').value = 500;
             if(getEl('bandwidth')) getEl('bandwidth').value = 1000;
             if(getEl('usagePreset')) getEl('usagePreset').value = 'wifi';
-            App.applyPreset(false);
+            applyPreset(false);
 
             html += `
             <div style="padding:15px; background:rgba(255,255,255,0.05); border-radius:8px;">
+                <div class="file-upload-wrapper">
+                    <label for="wifFeedScriptUpload" class="file-upload-label">📂 Upload WiFeed Script para Análise (opcional)</label>
+                    <input type="file" id="wifFeedScriptUpload" accept=".rsc,.txt">
+                </div>
+
                 <div class="checkbox-item" style="margin-top:0; margin-bottom:10px;">
                     <input type="checkbox" id="hs_no_queue" onchange="App.toggleHsFields(); App.calculate()">
                     <label>Sem controle de banda (Pass-through)</label>
@@ -1031,7 +1174,7 @@ const App = (function() {
             if(getEl('users')) getEl('users').value = 250;
             if(getEl('bandwidth')) getEl('bandwidth').value = 1000;
             if(getEl('usagePreset')) getEl('usagePreset').value = 'heavy';
-            App.applyPreset(false);
+            applyPreset(false);
 
             html += `
             <div style="background:rgba(137, 180, 250, 0.1); padding:15px; border-radius:8px; border:1px solid var(--primary-glow);">
@@ -1051,10 +1194,18 @@ const App = (function() {
             if(getEl('users')) getEl('users').value = 50;
             if(getEl('bandwidth')) getEl('bandwidth').value = 1000;
             if(getEl('usagePreset')) getEl('usagePreset').value = 'standard';
-            App.applyPreset(false);
+            applyPreset(false);
         }
 
         container.innerHTML = html;
+        
+        if (sc === 'hotspot') {
+            setTimeout(() => {
+                const upl = getEl('wifFeedScriptUpload');
+                if (upl) upl.addEventListener('change', handleFileUpload);
+            }, 100);
+        }
+
         if(getEl('corp_queues')) {
             getEl('corp_queues').addEventListener('change', function() {
                 const spd = getEl('corpSpeed');
@@ -1121,7 +1272,7 @@ const App = (function() {
             const poolEl = getEl('lanPool');
             if (poolEl) poolEl.value = `${startIp}-${endIp}`;
         }
-        App.calculate();
+        calculate();
     }
 
     function long2ip(ip) {
@@ -1234,7 +1385,6 @@ const App = (function() {
         const overbooking = (demand / bw).toFixed(1);
         const obClass = overbooking > 10 ? 'warn' : 'ok';
 
-        // Check for Bandwidth Control Card
         let bwControlHtml = '';
         let dl = 0, ul = 0;
         const sc = getVal('scenario');
@@ -1444,7 +1594,7 @@ const App = (function() {
         
         const leaseStr = (lanLease >= 60) ? `${Math.floor(lanLease/60)}h` : `${lanLease}m`;
 
-        let s = `# Script Gerado pelo MikroTik Architect v5.9\n`;
+        let s = `# Script Gerado pelo MikroTik Architect v6.1\n`;
         s += `/system identity set name="${identity}"\n\n`;
 
         s += `# --- SERVIÇOS IP ---\n`;
