@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>MikroTik Architect v7.6 (Final)</title>
+    <title>MikroTik Architect v7.7 (Final)</title>
     <meta name="description" content="Calculadora de dimensionamento de hardware MikroTik e gerador de script com suporte a WiFeed.">
     <style>
         :root {
@@ -560,7 +560,7 @@
     <!-- Header Area -->
     <header class="header">
         <div class="brand">
-            <h1>MikroTik Architect <span class="version-tag">v7.6</span></h1>
+            <h1>MikroTik Architect <span class="version-tag">v7.7</span></h1>
             <div style="font-size: 0.9rem; color: var(--text-muted);">Planejamento & Scripting (Full Management)</div>
         </div>
         <button class="btn btn-secondary btn-sm" onclick="openModal('advancedModal')">
@@ -2111,11 +2111,37 @@ window.App = (function() {
     function removeNat(idx) { natRules.splice(idx, 1); renderNat(); calculate(); }
     function applyPreset(fs) { 
         const p = getVal('usagePreset'); 
-        if(p==='wifi') { appConfig.simultaneity=0.5; appConfig.cpu_pps_factor=0.45; }
-        else if(p==='cabled') { appConfig.simultaneity=0.7; appConfig.cpu_pps_factor=0.25; }
-        else if(p==='heavy') { appConfig.simultaneity=0.9; appConfig.cpu_pps_factor=0.5; }
-        else { appConfig.simultaneity=0.6; appConfig.cpu_pps_factor=0.3; }
-        getEl('cfg_simult').value = appConfig.simultaneity;
+        let txt = "Padrão";
+
+        if(p==='wifi') { 
+            appConfig.simultaneity=0.5; 
+            appConfig.cpu_pps_factor=0.45; 
+            txt = "Wi-Fi";
+        }
+        else if(p==='cabled') { 
+            appConfig.simultaneity=0.7; 
+            appConfig.cpu_pps_factor=0.25; 
+            txt = "Cabo";
+        }
+        else if(p==='heavy') { 
+            appConfig.simultaneity=0.9; 
+            appConfig.cpu_pps_factor=0.5; 
+            txt = "Intenso";
+        }
+        else { 
+            appConfig.simultaneity=0.6; 
+            appConfig.cpu_pps_factor=0.3; 
+            txt = "Padrão";
+        }
+
+        // Update Advanced Modal Inputs
+        const elSimult = getEl('cfg_simult'); if(elSimult) elSimult.value = appConfig.simultaneity;
+        const elCpu = getEl('cfg_cpu_pps'); if(elCpu) elCpu.value = appConfig.cpu_pps_factor;
+
+        // Update Main UI Label
+        const label = getEl('activeProfileLabel');
+        if(label) label.innerText = "Perfil: " + txt;
+
         if(fs) calculate(); 
     }
     function updateConfig() { appConfig.simultaneity = parseFloat(getVal('cfg_simult')); calculate(); }
