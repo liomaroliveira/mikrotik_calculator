@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>MikroTik Architect v7.5 (Final)</title>
+    <title>MikroTik Architect v7.6 (Final)</title>
     <meta name="description" content="Calculadora de dimensionamento de hardware MikroTik e gerador de script com suporte a WiFeed.">
     <style>
         :root {
@@ -560,7 +560,7 @@
     <!-- Header Area -->
     <header class="header">
         <div class="brand">
-            <h1>MikroTik Architect <span class="version-tag">v7.5</span></h1>
+            <h1>MikroTik Architect <span class="version-tag">v7.6</span></h1>
             <div style="font-size: 0.9rem; color: var(--text-muted);">Planejamento & Scripting (Full Management)</div>
         </div>
         <button class="btn btn-secondary btn-sm" onclick="openModal('advancedModal')">
@@ -1754,7 +1754,7 @@ window.App = (function() {
         const lanLease = getVal('lanLeaseTime');
         const leaseStr = (lanLease >= 60) ? `${Math.floor(lanLease/60)}h` : `${lanLease}m`;
 
-        let s = `# Script Gerado pelo MikroTik Architect v7.5\n`;
+        let s = `# Script Gerado pelo MikroTik Architect v7.6\n`;
         s += `/system identity set name="${identity}"\n\n`;
 
         s += `# --- SERVIÇOS IP ---\n`;
@@ -2005,17 +2005,34 @@ window.App = (function() {
         updateBar('bar-cpu', '', cpu, 100);
         updateBar('bar-ram', '', ramVal, ramMax);
         setText('lbl-cpu', Math.round(cpu)+'%');
-        setText('lbl-ram', Math.round(ram)+'% ' + Math.round(ramVal)+'MB');
+        
+        // Restore: Sidebar Detail Text
+        setText('det-cpu', `${Math.round(cpuVal)} / ${cpuMax} pts`);
+        
+        const ramFree = Math.max(0, ramMax - ramVal);
+        setText('lbl-ram', `${Math.round(ramVal)}MB ${Math.round(ram)}%`);
+        setText('det-ram', `${Math.round(ramFree)}MB Livres`); // Restore: Sidebar Detail Text
+
+        const cpuTxtMain = `${Math.round(cpu)}%`;
+        const cpuTxtSub = `${Math.round(cpuVal)} / ${cpuMax} pts`;
+        const ramTxtMain = `${Math.round(ramVal)}MB ${Math.round(ram)}%`;
+        const ramTxtSub = `${Math.round(ramFree)}MB Livres`;
+
         updateBar('mob-bar-cpu', '', cpu, 100);
+        setText('mob-lbl-cpu-main', cpuTxtMain);
+        setText('mob-lbl-cpu-sub', cpuTxtSub);
+        
         updateBar('mob-bar-ram', '', ramVal, ramMax);
-        setText('mob-lbl-cpu-main', Math.round(cpu)+'%');
-        setText('mob-lbl-ram-main', Math.round(ramVal)+'MB');
+        setText('mob-lbl-ram-main', ramTxtMain);
+        setText('mob-lbl-ram-sub', ramTxtSub);
+
         updateBar('adv-bar-cpu', '', cpu, 100);
+        setText('adv-lbl-cpu-main', cpuTxtMain);
+        setText('adv-lbl-cpu-sub', cpuTxtSub); // Restored format
+        
         updateBar('adv-bar-ram', '', ramVal, ramMax);
-        setText('adv-lbl-cpu-main', Math.round(cpu)+'%');
-        setText('adv-lbl-cpu-sub', Math.round(cpuVal));
-        setText('adv-lbl-ram-main', Math.round(ram)+'%');
-        setText('adv-lbl-ram-sub', Math.round(ramVal)+'MB');
+        setText('adv-lbl-ram-main', ramTxtMain);
+        setText('adv-lbl-ram-sub', ramTxtSub); // Restored format
         
         const v = getEl('verdict-box');
         if(v) {
