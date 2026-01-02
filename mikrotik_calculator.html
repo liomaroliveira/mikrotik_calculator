@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MikroTik Architect v4.4</title>
+    <title>MikroTik Architect v4.5</title>
     <style>
         :root {
             --bg: #13131f; --card-bg: #1e1e2e; --input-bg: #181825;
@@ -51,6 +51,23 @@
         }
         select:focus, input:focus { border-color: var(--accent); }
         
+        /* Password Wrapper */
+        .password-wrapper { position: relative; width: 100%; }
+        .password-wrapper input { padding-right: 35px; width: 100%; }
+        .password-toggle { position: absolute; right: 10px; top: 50%; transform: translateY(-30%); cursor: pointer; opacity: 0.7; }
+        .password-toggle:hover { opacity: 1; }
+
+        /* Magic Wand Button */
+        .magic-btn {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            border: none; color: white; border-radius: 6px; width: 36px; height: 36px;
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+            font-size: 1.2rem; margin-top: 5px; box-shadow: 0 2px 10px rgba(245, 87, 108, 0.4);
+            transition: transform 0.2s;
+        }
+        .magic-btn:hover { transform: scale(1.1) rotate(10deg); }
+        .magic-btn:active { transform: scale(0.95); }
+
         .checkbox-wrapper { display: flex; align-items: center; margin-top: 8px; background: rgba(255,255,255,0.03); padding: 10px; border-radius: 6px; cursor: pointer; border: 1px solid transparent; }
         .checkbox-wrapper:hover { border-color: var(--border); }
         .checkbox-wrapper input { width: 18px; height: 18px; margin-right: 10px; cursor: pointer; }
@@ -80,7 +97,7 @@
             font-size: 12px; width: 250px; z-index: 9999; margin-top: 25px; border: 1px solid var(--border); box-shadow: 0 5px 15px black;
         }
         
-        /* Modals */
+        /* Modais */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 5000; backdrop-filter: blur(4px); justify-content: center; align-items: center; padding: 10px; }
         .modal { 
             background: var(--card-bg); width: 100%; max-width: 1000px; max-height: 95vh; 
@@ -120,8 +137,8 @@
         
         <div style="display:flex; flex-wrap: wrap; justify-content:space-between; align-items:center; gap: 15px;">
             <div>
-                <h1 style="font-size:1.6rem;">MikroTik Architect <span style="font-size:0.5em; background:var(--accent); color:#1e1e2e; padding:2px 6px; border-radius:4px; vertical-align:middle;">v4.4</span></h1>
-                <div style="color:#888; font-size:0.9em;">Planejamento & Scripting (Full Management)</div>
+                <h1 style="font-size:1.6rem;">MikroTik Architect <span style="font-size:0.5em; background:var(--accent); color:#1e1e2e; padding:2px 6px; border-radius:4px; vertical-align:middle;">v4.5</span></h1>
+                <div style="color:#888; font-size:0.9em;">Planejamento & Scripting (Intelligent Edition)</div>
             </div>
             <button class="btn btn-adv" style="width:auto;" onclick="openModal('advancedModal')">🛠️ Avançado</button>
         </div>
@@ -234,8 +251,11 @@
                     <h4>👤 Usuários</h4>
                     <div id="usersList">
                         <div style="background:rgba(0,0,0,0.3); padding:10px; border-radius:4px; margin-bottom:5px;">
-                            <input type="text" id="adminName" value="liomar">
-                            <input type="text" id="adminPass" value="Mudar@123">
+                            <input type="text" id="adminName" value="liomar" placeholder="User" style="margin-bottom:5px;">
+                            <div class="password-wrapper">
+                                <input type="password" id="adminPass" value="Mudar@123" placeholder="Pass">
+                                <span class="password-toggle" onclick="togglePassVisibility('adminPass', this)">👁️</span>
+                            </div>
                             <small style="color:var(--success)">Admin Principal</small>
                         </div>
                     </div>
@@ -250,39 +270,28 @@
                     <h4>🌐 Rede LAN & Identidade</h4>
                     <label>Nome do Router (Identity)</label><input type="text" id="identityName" value="MikroTik-Router">
                     
-                    <label>IP LAN / Máscara</label>
-                    <input type="text" id="lanIp" value="192.168.88.1/24" placeholder="Ex: 192.168.10.1/24">
+                    <label>IP LAN / Máscara <span class="info-icon" data-tooltip="Suporta CIDR (/24, /23, /21...). Pool calculada automaticamente.">i</span></label>
+                    <input type="text" id="lanIp" value="192.168.88.1/24" placeholder="Ex: 192.168.88.1/24">
                     
-                    <label>Pool DHCP <span class="info-icon" data-tooltip="Calculado automaticamente.">i</span></label>
+                    <label>Pool DHCP <span class="info-icon" data-tooltip="Ajustado autom. pelo IP LAN. Redes maiores (/21) consomem mais RAM.">i</span></label>
                     <input type="text" id="lanPool" value="192.168.88.10-192.168.88.254">
 
                     <div style="margin-top:15px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.1);">
                         <label>DHCP Lease Time (LAN)</label>
-                        <div style="display:flex; gap:10px;">
+                        <div style="display:flex; gap:10px; align-items:center;">
                             <select id="lanLease" onchange="calculate()">
                                 <option value="10m">10 min</option>
                                 <option value="30m">30 min</option>
                                 <option value="1h">1 hora</option>
+                                <option value="3h">3 horas</option>
+                                <option value="6h">6 horas</option>
                                 <option value="12h">12 horas</option>
                                 <option value="1d">1 dia</option>
                                 <option value="3d">3 dias</option>
                             </select>
+                            <button class="magic-btn" onclick="autoTuneLease('lanLease')" title="Calcular tempo ideal">🪄</button>
                         </div>
                         <span id="lanLeaseInfo" class="lease-impact">...</span>
-                        
-                        <div id="hsLeaseWrapper" class="hidden">
-                            <label style="margin-top:10px;">DHCP Lease Time (Hotspot)</label>
-                            <div style="display:flex; gap:10px;">
-                                <select id="hsLease" onchange="calculate()">
-                                    <option value="10m">10 min</option>
-                                    <option value="30m">30 min</option>
-                                    <option value="1h">1 hora</option>
-                                    <option value="6h">6 horas</option>
-                                    <option value="1d">1 dia</option>
-                                </select>
-                            </div>
-                            <span id="hsLeaseInfo" class="lease-impact">...</span>
-                        </div>
                     </div>
                 </div>
 
@@ -293,41 +302,27 @@
 
                 <div class="adv-section">
                     <h4>🔧 Ferramentas</h4>
-                    
-                    <div class="checkbox-wrapper"><input type="checkbox" id="svc_upnp"><label>UPnP</label></div>
-                    
-                    <div class="checkbox-wrapper">
-                        <input type="checkbox" id="svc_snmp" onchange="toggleToolField('snmpBox')">
-                        <label>SNMP / Zabbix</label>
-                    </div>
+                    <div class="checkbox-wrapper"><input type="checkbox" id="svc_upnp" checked><label>UPnP</label></div>
+                    <div class="checkbox-wrapper"><input type="checkbox" id="svc_snmp" onchange="toggleToolField('snmpBox')"><label>SNMP / Zabbix</label></div>
                     <div id="snmpBox" class="hidden" style="margin-left:25px; margin-bottom:10px; border-left:2px solid var(--accent); padding-left:10px;">
                         <input type="text" id="snmpComm" placeholder="Community (public)">
                         <input type="text" id="snmpContact" placeholder="Contact">
                         <input type="text" id="snmpLoc" placeholder="Location">
                     </div>
-
-                    <div class="checkbox-wrapper">
-                        <input type="checkbox" id="svc_watchdog" checked onchange="toggleToolField('wdBox')">
-                        <label>Watchdog</label>
-                    </div>
+                    <div class="checkbox-wrapper"><input type="checkbox" id="svc_watchdog" checked onchange="toggleToolField('wdBox')"><label>Watchdog</label></div>
                     <div id="wdBox" style="margin-left:25px; margin-bottom:10px; border-left:2px solid var(--accent); padding-left:10px;">
                         <input type="text" id="wdAddress" placeholder="Watch Address">
                     </div>
-
-                    <div class="checkbox-wrapper">
-                        <input type="checkbox" id="svc_tr069" onchange="toggleToolField('trBox')">
-                        <label>TR-069 Client</label>
-                    </div>
+                    <div class="checkbox-wrapper"><input type="checkbox" id="svc_tr069" onchange="toggleToolField('trBox')"><label>TR-069 Client</label></div>
                     <div id="trBox" class="hidden" style="margin-left:25px; margin-bottom:10px; border-left:2px solid var(--accent); padding-left:10px;">
                         <input type="text" id="trUrl" placeholder="ACS URL">
                         <input type="text" id="trUser" placeholder="ACS User">
                         <input type="text" id="trPass" placeholder="ACS Pass">
                     </div>
-
                     <label style="margin-top:10px;">Auto-Reboot</label>
                     <select id="autoReboot" onchange="toggleToolField('rebootCustomBox', this.value === 'custom')">
                         <option value="no">Não</option>
-                        <option value="daily">Diário</option>
+                        <option value="daily" selected>Diário (04:00)</option>
                         <option value="weekly">Semanal</option>
                         <option value="custom">Personalizado</option>
                     </select>
@@ -449,29 +444,62 @@
 
         document.getElementById('cfg_simult').value = appConfig.simultaneity;
         document.getElementById('cfg_cpu_pps').value = appConfig.cpu_pps_factor;
+        
+        // Listeners for Smart Calculation
         document.getElementById('lanIp').addEventListener('input', autoCalcPool);
         
         handleScenarioChange();
         calculate();
     }
 
+    // --- LOGIC: AUTO POOL (CIDR AWARE) ---
     function autoCalcPool(e) {
         const val = e.target.value;
-        const parts = val.split('.');
-        if(parts.length === 4 && val.includes('/24')) {
-            const prefix = parts.slice(0, 3).join('.');
-            if(!isNaN(parts[2])) document.getElementById('lanPool').value = `${prefix}.10-${prefix}.254`;
+        const parts = val.split('/');
+        
+        if (parts.length === 2) {
+            const ip = parts[0];
+            const mask = parseInt(parts[1]);
+            const octets = ip.split('.').map(Number);
+            
+            if(octets.length === 4 && !isNaN(mask)) {
+                // Calculate Start IP (Network + 10) and End IP (Broadcast - 1) simplified for /24-/21
+                // This is a basic approximation for UI display
+                let start = [...octets];
+                let end = [...octets];
+                
+                // Mask Logic (Simplified for typical Class C aggregation)
+                if (mask === 24) {
+                    start[3] = 10; end[3] = 254;
+                } else if (mask === 23) {
+                    start[2] = start[2] & 254; // Even
+                    start[3] = 10;
+                    end[2] = start[2] + 1;
+                    end[3] = 254;
+                } else if (mask === 22) {
+                    start[2] = start[2] & 252;
+                    start[3] = 10;
+                    end[2] = start[2] + 3;
+                    end[3] = 254;
+                } else if (mask === 21) {
+                    start[2] = start[2] & 248;
+                    start[3] = 10;
+                    end[2] = start[2] + 7;
+                    end[3] = 254;
+                }
+                
+                document.getElementById('lanPool').value = `${start.join('.')}-${end.join('.')}`;
+                calculate(); // Update RAM calculation based on subnet size
+            }
         }
     }
 
+    // --- LOGIC: UI ---
     function handleScenarioChange() {
         const sc = document.getElementById('scenario').value;
         const container = document.getElementById('dynamicOptions');
         const hsLeaseWrapper = document.getElementById('hsLeaseWrapper');
         let html = '';
-        
-        // Exibir seletor de Lease do Hotspot apenas se for Hotspot
-        if(hsLeaseWrapper) hsLeaseWrapper.classList.toggle('hidden', sc !== 'hotspot');
         
         if (sc === 'corporate') {
             html += `
@@ -502,6 +530,30 @@
                         <input type="number" id="hsUl" value="1" placeholder="Up" oninput="calculate()">
                     </div>
                 </div>
+                
+                <div style="margin-top:15px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.1);">
+                    <label>Config DHCP WiFeed (Para cálculo de carga)</label>
+                    <div style="display:flex; gap:10px;">
+                        <select id="hsSubnet" onchange="calculate()" style="flex:1;">
+                            <option value="24">/24 (254 IPs)</option>
+                            <option value="23">/23 (510 IPs)</option>
+                            <option value="22">/22 (1022 IPs)</option>
+                            <option value="21" selected>/21 (2046 IPs)</option>
+                            <option value="20">/20 (4094 IPs)</option>
+                        </select>
+                        <select id="hsLease" onchange="calculate()" style="flex:1;">
+                            <option value="10m">10 min</option>
+                            <option value="30m">30 min</option>
+                            <option value="1h" selected>1 hora</option>
+                            <option value="3h">3 horas</option>
+                            <option value="6h">6 horas</option>
+                            <option value="12h">12 horas</option>
+                            <option value="1d">1 dia</option>
+                        </select>
+                        <button class="magic-btn" onclick="autoTuneLease('hsLease')" title="Calcular tempo ideal">🪄</button>
+                    </div>
+                    <span id="hsLeaseInfo" class="lease-impact">Padrão WiFeed: /21 e 1h</span>
+                </div>
             </div>`;
         }
         container.innerHTML = html;
@@ -524,8 +576,46 @@
         } else { el.classList.toggle('hidden', !force); }
         calculate();
     }
+    
+    function togglePassVisibility(id, icon) {
+        const input = document.getElementById(id);
+        if (input.type === "password") { input.type = "text"; icon.innerText = "🙈"; } 
+        else { input.type = "password"; icon.innerText = "👁️"; }
+    }
 
-    // --- LOGIC: LEASE TIME HELPER ---
+    // --- LOGIC: MAGIC WAND (AUTO TUNE) ---
+    function autoTuneLease(selectId) {
+        const model = hardwareDB[document.getElementById('model').value];
+        const users = parseInt(document.getElementById('users').value) || 50;
+        const select = document.getElementById(selectId);
+        
+        let ideal = "1h";
+        
+        // Logic: RAM vs Users
+        // Low RAM (<64) always prefers short leases to recycle IPs and keep ARP table small
+        if (model.ram <= 32) {
+            ideal = "30m";
+        } else if (model.ram <= 64) {
+            ideal = (users > 100) ? "30m" : "1h";
+        } else if (model.ram <= 256) {
+            // Medium RAM: can handle longer leases to save CPU
+            ideal = (users > 500) ? "1h" : "3h";
+        } else {
+            // High RAM: Prefer Long Lease to minimize CPU interrupts
+            ideal = "1d";
+        }
+        
+        select.value = ideal;
+        calculate();
+        
+        // Visual Feedback
+        const infoId = selectId === 'lanLease' ? 'lanLeaseInfo' : 'hsLeaseInfo';
+        const info = document.getElementById(infoId);
+        const originalText = info.innerText;
+        info.innerText = `✨ Ajustado para ${ideal} (Equilíbrio RAM/CPU)`;
+        setTimeout(() => { calculate(); /* Reset text via standard calc */ }, 2000);
+    }
+
     function getLeaseMinutes(val) {
         if(val.includes('m')) return parseInt(val);
         if(val.includes('h')) return parseInt(val) * 60;
@@ -538,42 +628,24 @@
         const mins = getLeaseMinutes(val);
         const info = document.getElementById(infoId);
         
-        let text = "";
-        let style = "impact-neutral";
+        let text = ""; let style = "impact-neutral";
         
-        // Sugestão baseada em RAM total da RB
-        let suggestion = "";
-        if (ramMax <= 32) suggestion = "30m";
-        else if (ramMax <= 64) suggestion = "1h";
-        else suggestion = "1d";
-
         if (isHotspot) {
             if (mins <= 60) { text = "📉 Alivia RAM (Recomendado)"; style = "impact-good"; }
             else if (mins > 360) { text = "📈 Alto Consumo de RAM!"; style = "impact-bad"; }
-            else { text = "Equilibrado"; }
+            else text = "Equilibrado";
         } else {
             if (mins < 60) { text = "📈 Mais CPU (Renovações)"; style = "impact-bad"; }
             else { text = "📉 Economiza CPU"; style = "impact-good"; }
         }
         
-        // Override recomendação se hardware fraco
-        if(ramMax <= 32 && mins > 60 && isHotspot) {
-            text = "⚠️ PERIGO: RAM Insuficiente!"; style = "impact-bad";
-        }
+        if(ramMax <= 32 && mins > 60 && isHotspot) { text = "⚠️ PERIGO: RAM Insuficiente!"; style = "impact-bad"; }
 
-        info.innerText = `${text} (Sugestão: ${suggestion})`;
+        info.innerText = `${text}`;
         info.className = "lease-impact " + style;
         
-        // Return Factor for Calc
-        if(isHotspot) {
-             // Hotspot: Tempo alto = MUITA RAM gasta (fantasmas)
-             if(mins > 60) return (mins/60) * 0.2; // Penalidade progressiva RAM
-             return 0;
-        } else {
-             // LAN: Tempo baixo = CPU gasta
-             if(mins < 60) return 0.5; // Bonus CPU cost
-             return 0; 
-        }
+        if(isHotspot) { if(mins > 60) return (mins/60) * 0.2; return 0; } 
+        else { if(mins < 60) return 0.5; return 0; }
     }
 
     // --- CALCULATE ---
@@ -614,13 +686,23 @@
 
         ipServicesList.forEach(s => { if (document.getElementById('svc_' + s.id).checked) ramUsage += 0.2; });
 
-        // LEASE TIME IMPACT
-        // LAN
+        // LEASE TIME IMPACT & SUBNET IMPACT
         const lanCpuPenalty = updateLeaseFeedback('lanLease', 'lanLeaseInfo', false, model.ram);
         ruleScore += (users * lanCpuPenalty); 
         
-        // HOTSPOT
+        // LAN Subnet Size Impact (Approx RAM per potential lease entry/ARP)
+        const lanIp = document.getElementById('lanIp').value;
+        if (lanIp.includes('/23')) ramUsage += 1;
+        if (lanIp.includes('/22')) ramUsage += 2;
+        if (lanIp.includes('/21')) ramUsage += 4;
+
         if (scenario === 'hotspot') {
+            // Hotspot Subnet Weight
+            const hsSubnet = document.getElementById('hsSubnet')?.value || 24;
+            if (hsSubnet == 23) ramUsage += 1.5;
+            if (hsSubnet == 22) ramUsage += 3;
+            if (hsSubnet <= 21) ramUsage += 6;
+
             const hsRamPenalty = updateLeaseFeedback('hsLease', 'hsLeaseInfo', true, model.ram);
             ramUsage += (users * (0.45 + hsRamPenalty));
         } else {
@@ -681,7 +763,7 @@
         const lanPool = document.getElementById('lanPool').value;
         const lanLease = document.getElementById('lanLease').value;
         
-        let s = `# Script Gerado pelo MikroTik Architect v4.4\n`;
+        let s = `# Script Gerado pelo MikroTik Architect v4.5\n`;
         s += `/system identity set name="${identity}"\n\n`;
 
         s += `# --- SERVIÇOS IP ---\n`;
@@ -743,16 +825,7 @@
         s += `/ip address add address=${lanIp} interface=bridge-LAN\n`;
         s += `/ip pool add name=dhcp_pool ranges=${lanPool}\n`;
         s += `/ip dhcp-server add name=dhcp1 interface=bridge-LAN address-pool=dhcp_pool disabled=no lease-time=${lanLease}\n`;
-        s += `/ip dhcp-server network add address=${lanIp.replace('/24','.0/24')} gateway=${lanIp.split('/')[0]} dns-server=8.8.8.8,1.1.1.1\n`;
-        
-        // HOTSPOT SERVER IF NEEDED
-        if (scenario === 'hotspot') {
-             const hsLease = document.getElementById('hsLease').value;
-             s += `\n# --- HOTSPOT (Config Parcial) ---\n`;
-             s += `# Ajuste de Lease Time do Hotspot\n`;
-             s += `/ip dhcp-server set [find name="dhcp-hotspot"] lease-time=${hsLease} comment="Ajustado pelo MikroTik Architect"\n`;
-        }
-
+        s += `/ip dhcp-server network add address=${lanIp.replace(/\/.*$/,'.0') + '/' + lanIp.split('/')[1]} gateway=${lanIp.split('/')[0]} dns-server=8.8.8.8,1.1.1.1\n`;
         s += `/ip firewall nat add action=masquerade chain=srcnat out-interface-list=WAN\n`;
 
         if(natRules.length > 0) {
@@ -766,7 +839,7 @@
             if (document.getElementById('corp_queues').checked) {
                 let dl = document.getElementById('corpDl').value;
                 let ul = document.getElementById('corpUl').value;
-                s += `/queue simple add name="Limit_Users" target=${lanIp.replace('/24','.0/24')} max-limit=${ul}M/${dl}M\n`;
+                s += `/queue simple add name="Limit_Users" target=${lanIp.replace(/\/.*$/,'.0') + '/' + lanIp.split('/')[1]} max-limit=${ul}M/${dl}M\n`;
             }
         }
 
@@ -780,7 +853,7 @@
     function addExtraUser() { const name = prompt("Nome:"); const pass = prompt("Senha:"); if(name && pass) { extraUsers.push({name, pass}); renderExtras(); } }
     function renderExtras() {
         const div = document.getElementById('usersList');
-        div.innerHTML = `<div style="background:rgba(0,0,0,0.3); padding:10px; border-radius:4px; margin-bottom:5px;"><input type="text" id="adminName" value="liomar"><input type="text" id="adminPass" value="Mudar@123"><small style="color:var(--success)">Admin Principal</small></div>`;
+        div.innerHTML = `<div style="background:rgba(0,0,0,0.3); padding:10px; border-radius:4px; margin-bottom:5px;"><input type="text" id="adminName" value="liomar" style="margin-bottom:5px;"><div class="password-wrapper"><input type="password" id="adminPass" value="Mudar@123"><span class="password-toggle" onclick="togglePassVisibility('adminPass', this)">👁️</span></div><small style="color:var(--success)">Admin Principal</small></div>`;
         extraUsers.forEach((u, idx) => div.innerHTML += `<div style="background:#2a2a35; padding:8px; margin-top:5px; border-radius:4px; display:flex; justify-content:space-between;"><span>${u.name}</span> <span style="color:red;" onclick="extraUsers.splice(${idx},1); renderExtras()">[X]</span></div>`);
     }
     function addNatRule() {
