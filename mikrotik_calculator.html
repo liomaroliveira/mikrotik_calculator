@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>MikroTik Architect v5.8</title>
+    <title>MikroTik Architect v5.9</title>
     <meta name="description" content="Calculadora de dimensionamento de hardware MikroTik e gerador de script.">
     <style>
         :root {
@@ -266,7 +266,7 @@
             height: 100%; 
             border-radius: 6px; 
             transition: width 0.5s ease-out; 
-            background-size: 20px 20px;
+            background-size: 40px 40px; /* Increased size for visibility */
             background-image: linear-gradient(
                 45deg, 
                 rgba(255, 255, 255, 0.15) 25%, 
@@ -280,10 +280,10 @@
         }
 
         .meter-fill.green { background-color: var(--success); animation: flow 2s linear infinite; }
-        .meter-fill.yellow { background-color: var(--warning); animation: flow 0.8s linear infinite; }
-        .meter-fill.red { background-color: var(--danger); animation: flow 0.4s linear infinite, pulse 1.5s infinite; }
+        .meter-fill.yellow { background-color: var(--warning); animation: flow 1s linear infinite; }
+        .meter-fill.red { background-color: var(--danger); animation: flow 0.5s linear infinite, pulse 1.5s infinite; }
 
-        @keyframes flow { 0% { background-position: 0 0; } 100% { background-position: 20px 20px; } }
+        @keyframes flow { 0% { background-position: 0 0; } 100% { background-position: 40px 40px; } }
         @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); } 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); } }
 
         .meter-detail { font-size: 0.75rem; color: var(--text-muted); text-align: right; margin-top: 4px; }
@@ -299,7 +299,7 @@
             margin-top: 20px;
             background: var(--bg-input);
             color: var(--text-muted);
-            position: relative; /* For popup positioning */
+            position: relative;
         }
         .verdict.ok { background: rgba(16, 185, 129, 0.2); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.3); }
         .verdict.warn { background: rgba(245, 158, 11, 0.2); color: var(--warning); border: 1px solid rgba(245, 158, 11, 0.3); }
@@ -313,23 +313,31 @@
         
         .dash-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); /* Adjusted for mobile stacking logic */
             gap: 15px;
         }
 
         .dash-card {
-            background: rgba(255,255,255,0.03);
+            background: rgba(255,255,255,0.02);
             border: 1px solid rgba(255,255,255,0.05);
             border-radius: 12px;
             padding: 15px;
             display: flex;
             flex-direction: column;
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.08); /* Glow added */
+            transition: transform 0.2s, box-shadow 0.2s;
         }
         
-        .dash-icon { font-size: 1.5rem; margin-bottom: 10px; opacity: 0.8; }
-        .dash-title { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 5px; font-weight: 600; }
-        .dash-value { font-size: 1rem; font-weight: 600; color: var(--text-main); margin-bottom: 2px; }
-        .dash-sub { font-size: 0.75rem; color: var(--primary); }
+        .dash-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.2);
+            border-color: rgba(59, 130, 246, 0.3);
+        }
+        
+        .dash-icon { font-size: 1.5rem; margin-bottom: 10px; opacity: 0.9; }
+        .dash-title { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 5px; font-weight: 600; }
+        .dash-value { font-size: 0.95rem; font-weight: 700; color: var(--text-main); margin-bottom: 2px; word-break: break-word; }
+        .dash-sub { font-size: 0.75rem; color: var(--primary); opacity: 0.8; }
         .dash-sub.warn { color: var(--warning); }
 
         /* --- Mobile Sticky Footer --- */
@@ -360,7 +368,7 @@
             position: relative;
             display: flex; align-items: center; justify-content: center;
             width: 50px; cursor: pointer;
-            z-index: 2001; /* Ensure higher than stats */
+            z-index: 2001; 
         }
         .mf-verdict-tooltip {
             position: absolute; bottom: 110%; left: 0;
@@ -369,7 +377,7 @@
             display: none; pointer-events: none; margin-bottom: 5px;
             border: 1px solid var(--border);
             box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-            z-index: 3000; /* Highest priority */
+            z-index: 3000; 
         }
         .mf-verdict-wrapper:hover .mf-verdict-tooltip, .mf-verdict-wrapper:active .mf-verdict-tooltip { display: block; }
 
@@ -387,7 +395,7 @@
         .mf-main-val { font-size: 0.8rem; font-weight: 700; color: var(--text-main); }
         .mf-sub-val { font-size: 0.65rem; color: var(--text-muted); }
 
-        .mf-track { height: 8px; background: #333; border-radius: 4px; width: 100%; overflow: hidden; } /* Overrides standard for mobile */
+        .mf-track { height: 8px; background: #333; border-radius: 4px; width: 100%; overflow: hidden; position: relative; }
         .mf-verdict { font-size: 1.5rem; }
 
         /* --- Utilities --- */
@@ -397,6 +405,12 @@
         .profile-badge {
             display: inline-block; font-size: 0.7rem; padding: 2px 6px; border-radius: 4px;
             background: rgba(139, 92, 246, 0.2); color: var(--accent); margin-top: 4px;
+        }
+
+        /* Script Tools */
+        .script-tools {
+            display: flex; gap: 10px; justify-content: flex-end;
+            margin-bottom: 10px;
         }
 
         /* --- Modal --- */
@@ -437,7 +451,7 @@
     <!-- Header Area -->
     <header class="header">
         <div class="brand">
-            <h1>MikroTik Architect <span class="version-tag">v5.8</span></h1>
+            <h1>MikroTik Architect <span class="version-tag">v5.9</span></h1>
             <div style="font-size: 0.9rem; color: var(--text-muted);">Planejamento & Scripting (Full Management)</div>
         </div>
         <button class="btn btn-secondary btn-sm" onclick="openModal('advancedModal')">
@@ -826,10 +840,15 @@
     <div class="modal">
         <div class="modal-header">
             <h3>📄 Script Gerado</h3>
+            <div class="script-tools">
+                <button class="btn btn-secondary btn-sm" onclick="App.toggleWrap()">Word Wrap</button>
+                <button class="btn btn-secondary btn-sm" onclick="App.zoomText(-1)">A-</button>
+                <button class="btn btn-secondary btn-sm" onclick="App.zoomText(1)">A+</button>
+            </div>
             <button class="btn-ghost" style="width:auto;" onclick="closeModal('scriptModal')">✕</button>
         </div>
         <div class="modal-body" style="padding:0;">
-            <textarea id="finalScript" style="height: 400px; border:none; border-radius:0; padding:20px; font-family: 'Courier New', monospace; background: #0d1117; color: #56d364;" readonly></textarea>
+            <textarea id="finalScript" style="height: 400px; border:none; border-radius:0; padding:20px; font-family: 'Courier New', monospace; background: #0d1117; color: #56d364; font-size: 14px; white-space: pre;" readonly></textarea>
         </div>
         <div class="modal-footer">
             <button class="btn btn-secondary" onclick="App.copyToClipboard(this)">Copiar</button>
@@ -840,9 +859,9 @@
 
 <script>
 /**
- * MikroTik Architect v5.8
+ * MikroTik Architect v5.9
  * - Features: Auto LAN Pool, FastTrack Logic, Animated Meters, Upgrade Popup, Dashboard
- * - Changes: New Dashboard Logic, 95% threshold, Icon Update
+ * - Changes: New Dashboard Logic, 95% threshold, Icon Update, Glow Effects, Script Tools
  */
 const App = (function() {
     
@@ -852,6 +871,7 @@ const App = (function() {
     let appConfig = { simultaneity: 0.6, cpu_pps_factor: 0.3, fw_weight: 1.5 };
     let currentSuggestedModel = null;
     let sortedHardwareKeys = [];
+    let scriptFontSize = 14;
 
     const ipServicesList = [
         {id: 'api', name: 'API', def: false, port: 8728},
@@ -1210,10 +1230,26 @@ const App = (function() {
         const lanCidr = getInt('lanMask');
         const lanIps = Math.pow(2, 32 - lanCidr) - 2;
         
-        // Calculate Overbooking
         const demand = users * userPlan;
         const overbooking = (demand / bw).toFixed(1);
-        const obClass = overbooking > 10 ? 'warn' : 'ok'; // Simplified visual check logic could be added
+        const obClass = overbooking > 10 ? 'warn' : 'ok';
+
+        // Check for Bandwidth Control Card
+        let bwControlHtml = '';
+        let dl = 0, ul = 0;
+        const sc = getVal('scenario');
+        if ((sc === 'hotspot' && !isChecked('hs_no_queue')) || (sc === 'corporate' && isChecked('corp_queues'))) {
+            if (sc === 'hotspot') { dl = getInt('hsDl'); ul = getInt('hsUl'); }
+            else { dl = getInt('corpDl'); ul = getInt('corpUl'); }
+            
+            bwControlHtml = `
+            <div class="dash-card">
+                <div class="dash-icon">🚀</div>
+                <div class="dash-title">Controle de Banda</div>
+                <div class="dash-value">${dl}M Down / ${ul}M Up</div>
+                <div class="dash-sub">Por Dispositivo</div>
+            </div>`;
+        }
 
         let html = `
             <div class="dash-card">
@@ -1240,6 +1276,7 @@ const App = (function() {
                 <div class="dash-value">/${lanCidr}</div>
                 <div class="dash-sub">${lanIps} IPs Úteis</div>
             </div>
+            ${bwControlHtml}
             <div class="dash-card">
                 <div class="dash-icon">📊</div>
                 <div class="dash-title">Carga de Banda</div>
@@ -1377,6 +1414,24 @@ const App = (function() {
         }
     }
 
+    // --- Script Tools ---
+    function toggleWrap() {
+        const ta = getEl('finalScript');
+        if (ta) {
+            ta.style.whiteSpace = (ta.style.whiteSpace === 'pre') ? 'pre-wrap' : 'pre';
+        }
+    }
+
+    function zoomText(dir) {
+        const ta = getEl('finalScript');
+        if (ta) {
+            scriptFontSize += dir;
+            if (scriptFontSize < 10) scriptFontSize = 10;
+            if (scriptFontSize > 24) scriptFontSize = 24;
+            ta.style.fontSize = scriptFontSize + 'px';
+        }
+    }
+
     // --- Script Generation ---
     function generateScript() {
         const scenario = getVal('scenario');
@@ -1389,7 +1444,7 @@ const App = (function() {
         
         const leaseStr = (lanLease >= 60) ? `${Math.floor(lanLease/60)}h` : `${lanLease}m`;
 
-        let s = `# Script Gerado pelo MikroTik Architect v5.8\n`;
+        let s = `# Script Gerado pelo MikroTik Architect v5.9\n`;
         s += `/system identity set name="${identity}"\n\n`;
 
         s += `# --- SERVIÇOS IP ---\n`;
@@ -1583,7 +1638,7 @@ const App = (function() {
         toggleToolField, toggleBkp, generateScript, updateLanPool,
         addExtraUser, removeUser, addNatRule, removeNat,
         applyPreset, updateConfig, copyToClipboard, downloadScript, 
-        updateDhcpInfo, upgradeModel, togglePass
+        updateDhcpInfo, upgradeModel, togglePass, toggleWrap, zoomText
     };
 
 })();
