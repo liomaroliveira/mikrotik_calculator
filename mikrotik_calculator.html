@@ -333,7 +333,7 @@
         /* --- Upgrade Popup --- */
         .upgrade-popup-container {
             position: absolute;
-            top: 100%; /* Changed from bottom: 100% to push it below */
+            top: 100%; /* Push below parent */
             left: 0;
             width: 100%;
             margin-top: 10px;
@@ -1155,11 +1155,14 @@ window.App = (function() {
         const schedMatch = content.match(/interval=(\d+[smhd]+)/);
         if(schedMatch) result.schedulerInterval = schedMatch[1];
 
-        // Extract Walled Garden Lines - More robust regex
-        // Looks for lines starting with "/ip hotspot walled-garden ip add"
-        // Need to handle potential line breaks in RSC
+        // Extract Walled Garden Lines - More robust parsing
         const lines = content.split('\n');
-        result.walledGardenLines = lines.filter(l => l.trim().startsWith('/ip hotspot walled-garden ip add') || l.trim().startsWith('add action=accept') && l.includes('walled-garden'));
+        // Filter for any line that contains "walled-garden" AND "add"
+        result.walledGardenLines = lines.filter(l => {
+            const t = l.trim();
+            return (t.includes('walled-garden') && t.includes('add')) || 
+                   (t.startsWith('add') && (t.includes('dst-host') || t.includes('comment="WiFeed')));
+        });
         result.walledGardenCount = result.walledGardenLines.length;
 
         return result;
@@ -1278,7 +1281,8 @@ window.App = (function() {
 
         // Check previous state of body to persist accordion
         const prevBody = getEl('wifeedEditorBody');
-        const wasOpen = prevBody ? prevBody.classList.contains('open') : false;
+        // Force open if user just uploaded, otherwise respect state
+        const wasOpen = prevBody ? prevBody.classList.contains('open') : true;
 
         const p = wifeedState.parsed;
         const t = wifeedState.toggles;
